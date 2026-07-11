@@ -74,6 +74,33 @@ object QSenseColors {
     )
 }
 
+/**
+ * Criticality derived from an alert's severity. Severity arrives as a numeric anomaly score
+ * (e.g. 48.9) or, from other producers, a label ("high"/"medium"/"low"). Both map to one of these.
+ */
+enum class Criticality(val label: String, val color: Color) {
+    CRITICAL("CRITICAL", QSenseColors.coral),
+    WARNING("WARNING", QSenseColors.amber),
+    OK("OK", QSenseColors.sage),
+}
+
+/** Numeric thresholds (demo): >=40 critical, >=10 warning, else OK. Falls back to label matching. */
+fun classifySeverity(severity: String): Criticality {
+    val score = severity.trim().toFloatOrNull()
+    if (score != null) {
+        return when {
+            score >= 40f -> Criticality.CRITICAL
+            score >= 10f -> Criticality.WARNING
+            else -> Criticality.OK
+        }
+    }
+    return when (severity.trim().lowercase()) {
+        "high", "critical" -> Criticality.CRITICAL
+        "medium", "warning", "warn" -> Criticality.WARNING
+        else -> Criticality.OK
+    }
+}
+
 /** Sensor-reading colors (demo thresholds), used for the temperature/humidity readouts. */
 fun temperatureColor(celsius: Float): Color = when {
     celsius > 70f -> QSenseColors.coral

@@ -37,6 +37,27 @@ class InMemoryKnowledgeBaseTest {
     }
 
     @Test
+    fun fanMotorAlertRetrievesFanAndMotorKnowledge() {
+        // The live monitoring feed sends "Fan Motor" — retrieval must ground it (not just fall back).
+        val results = kb.retrieve(alert("Fan Motor"))
+        assertTrue(results.isNotEmpty(), "expected fan-motor knowledge")
+        assertTrue(
+            results.any { it.partKeywords.contains("fan") },
+            "expected fan-specific entries for a Fan Motor",
+        )
+    }
+
+    @Test
+    fun spindleBearingAlertRetrievesBearingKnowledge() {
+        val results = kb.retrieve(alert("Spindle Bearing"))
+        assertTrue(results.isNotEmpty(), "expected bearing knowledge")
+        assertTrue(
+            results.any { it.partKeywords.contains("bearing") || it.partKeywords.contains("spindle") },
+            "expected bearing/spindle entries",
+        )
+    }
+
+    @Test
     fun resultsAreCapped() {
         assertTrue(kb.retrieve(alert("Blade")).size <= 6)
     }

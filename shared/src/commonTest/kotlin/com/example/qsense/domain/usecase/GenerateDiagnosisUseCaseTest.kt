@@ -30,12 +30,26 @@ class GenerateDiagnosisUseCaseTest {
     }
 
     @Test
-    fun emptyCausesWhenModelOutputUnparseable() = runTest {
+    fun fallsBackToKnowledgeWhenModelOutputUnparseable() = runTest {
         val generator = FakeTextGenerator(response = "sorry, I cannot help")
 
         val diagnosis = useCase(generator)(alert)
 
-        assertTrue(diagnosis.causes.isEmpty())
+        // Falls back to the retrieved RAG knowledge so the operator still gets grounded causes.
+        assertTrue(diagnosis.causes.isNotEmpty(), "expected RAG fallback causes")
+        assertTrue(
+            diagnosis.causes.any { it.cause.contains("grease", ignoreCase = true) },
+            "fallback should surface the known blade grease/lubrication cause",
+        )
+    }
+
+    @Test
+    fun fallsBackToKnowledgeWhenModelThrows() = runTest {
+        val generator = FakeTextGenerator().apply { error = RuntimeException("stream error") }
+
+        val diagnosis = useCase(generator)(alert)
+
+        assertTrue(diagnosis.causes.isNotEmpty(), "a model stream error must still yield RAG causes")
     }
 
     @Test

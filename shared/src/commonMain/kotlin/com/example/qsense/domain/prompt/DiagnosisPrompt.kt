@@ -25,7 +25,10 @@ object DiagnosisPrompt {
             "- Each \"cause\" is a specific probable fault reason; each \"fix\" is a specific " +
             "corrective action. Keep each to one short phrase under 12 words. No vague filler.\n" +
             "- Ground your answer in the provided reference knowledge and sensor readings; prefer " +
-            "those known causes. Do not invent parts not mentioned in the alert."
+            "those known causes. Do not invent parts not mentioned in the alert.\n" +
+            "Example of the exact format:\n" +
+            "{\"causes\":[{\"cause\":\"Worn bearing\",\"fix\":\"Replace the bearing\"}," +
+            "{\"cause\":\"Insufficient lubrication\",\"fix\":\"Re-grease the shaft\"}]}"
 
     fun build(alert: FaultAlert, knowledge: List<KnowledgeEntry> = emptyList()): String {
         val machineNo = sanitize(alert.machineNo)

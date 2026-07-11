@@ -5,8 +5,7 @@ set -euo pipefail
 
 BROKER="${1:-test.mosquitto.org}"
 PORT="${2:-1883}"
-NAMESPACE="${3:-qsense-demo}"
+TOPIC="${3:-qsense/machine/resolutions}"
 
-TOPIC="qsense/${NAMESPACE}/resolutions"
 echo "Subscribing to ${BROKER}:${PORT}  topic=${TOPIC}  (Ctrl+C to stop)"
 mosquitto_sub -h "$BROKER" -p "$PORT" -t "$TOPIC" -q 1 -v

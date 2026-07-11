@@ -12,13 +12,18 @@ data class AndroidConfig(
 data class MqttConfig(
     val host: String = "test.mosquitto.org",
     val port: Int = 1883,
-    // Namespace to avoid topic collisions on a shared/public broker. Set per team.
-    val namespace: String = "qsense-demo",
+    // Raw MQTT (1883) is reset by some networks ("Connection reset by peer"). If that happens,
+    // set useWebSocket=true and port=8080 to tunnel over the broker's WebSocket listener.
+    val useWebSocket: Boolean = false,
+    val webSocketPath: String = "mqtt",
+    // Inbound monitoring/alerts topic the app subscribes to.
+    val alertsTopic: String = "qsense/machine/monitoring",
+    // Outbound resolutions topic (a distinct sibling so the app never re-ingests its own acks).
+    val resolutionsTopic: String = "qsense/machine/resolutions",
+    // Outbound minimal ack topic, published alongside the rich resolution on every resolve.
+    val ackTopic: String = "qsense/machine/ack",
     val publishTimeoutMs: Long = 10_000,
-) {
-    val alertsTopic: String get() = "qsense/$namespace/alerts"
-    val resolutionsTopic: String get() = "qsense/$namespace/resolutions"
-}
+)
 
 data class GenieXConfig(
     // Model bundle folder name under getExternalFilesDir(null)/models/, and its registry id.

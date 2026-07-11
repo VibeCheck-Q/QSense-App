@@ -5,6 +5,7 @@ import com.example.qsense.data.serialization.JsonProviders
 import com.example.qsense.di.MqttConfig
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.model.Resolution
+import com.example.qsense.domain.model.ResolvedAck
 import com.example.qsense.domain.service.ConnectionState
 import com.example.qsense.domain.service.MqttGateway
 import com.hivemq.client.mqtt.MqttClient
@@ -23,7 +24,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import java.time.Instant
 import java.util.UUID
 
 /**
@@ -43,22 +43,31 @@ class HiveMqttGateway(
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    private val client: Mqtt5AsyncClient = MqttClient.builder()
-        .useMqttVersion5()
-        .identifier("qsense-" + UUID.randomUUID().toString().take(8))
-        .serverHost(config.host)
-        .serverPort(config.port)
-        .automaticReconnectWithDefaultConfig()
-        .addConnectedListener {
-            Log.i(TAG, "connected to ${config.host}:${config.port}; subscribing")
-            // Connected is reported only after the subscription is acknowledged (see below).
-            subscribeToAlerts()
+    private val client: Mqtt5AsyncClient = run {
+        var builder = MqttClient.builder()
+            .useMqttVersion5()
+            .identifier("qsense-" + UUID.randomUUID().toString().take(8))
+            .serverHost(config.host)
+            .serverPort(config.port)
+        // Optional WebSocket transport: some networks reset raw MQTT on 1883 with "Connection
+        // reset by peer"; the broker's WebSocket listener (e.g. port 8080, path "mqtt") tunnels
+        // through the HTTP-friendly path instead. Default is plain MQTT on 1883.
+        if (config.useWebSocket) {
+            builder = builder.webSocketConfig().serverPath(config.webSocketPath).applyWebSocketConfig()
         }
-        .addDisconnectedListener { ctx ->
-            Log.w(TAG, "disconnected (source=${ctx.source}): ${ctx.cause}", ctx.cause)
-            _connectionState.value = ConnectionState.Disconnected
-        }
-        .buildAsync()
+        builder
+            .automaticReconnectWithDefaultConfig()
+            .addConnectedListener {
+                Log.i(TAG, "connected to ${config.host}:${config.port}; subscribing")
+                // Connected is reported only after the subscription is acknowledged (see below).
+                subscribeToAlerts()
+            }
+            .addDisconnectedListener { ctx ->
+                Log.w(TAG, "disconnected (source=${ctx.source}): ${ctx.cause}", ctx.cause)
+                _connectionState.value = ConnectionState.Disconnected
+            }
+            .buildAsync()
+    }
 
     override suspend fun connect() = withContext(io) {
         Log.i(TAG, "connecting to ${config.host}:${config.port}…")
@@ -93,6 +102,21 @@ class HiveMqttGateway(
         }
         // A QoS 1 publish can complete "normally" yet carry a broker rejection in getError();
         // surface it so the alert is not falsely marked resolved.
+        result.error.ifPresent { throw it }
+        Unit
+    }
+
+    override suspend fun publishResolvedAck(ack: ResolvedAck) = withContext(io) {
+        val payload = JsonProviders.strict.encodeToString(ack)
+            .toByteArray(Charsets.UTF_8)
+        val result = withTimeout(config.publishTimeoutMs) {
+            client.publishWith()
+                .topic(config.ackTopic)
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .payload(payload)
+                .send()
+                .await()
+        }
         result.error.ifPresent { throw it }
         Unit
     }

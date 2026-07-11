@@ -4,16 +4,34 @@
     android:height="108dp"
     android:viewportWidth="128"
     android:viewportHeight="128">
-    <!-- White "sense" waveform (kept within the adaptive safe zone), matching qsense-badge.svg. -->
+    <!-- Faithful qsense-badge.svg foreground (content sits inside the adaptive safe zone). -->
+
+    <!-- Six white tick marks (top + bottom rows), matching the badge. -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M50,34 L50,44 M64,34 L64,44 M78,34 L78,44 M50,84 L50,94 M64,84 L64,94 M78,84 L78,94" />
+
+    <!-- White meter box (rounded rect, x42 y44 w44 h40 rx9), stroked, no fill. -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="8"
+        android:strokeWidth="6"
+        android:strokeLineJoin="round"
+        android:pathData="M51,44 L77,44 A9,9 0 0 1 86,53 L86,75 A9,9 0 0 1 77,84 L51,84 A9,9 0 0 1 42,75 L42,53 A9,9 0 0 1 51,44 Z" />
+
+    <!-- White ECG waveform inside the box. -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M34,92 L34,52 L48,66 L48,52 L64,66 L64,34 L80,66 L80,52 L94,66 L94,92 Z" />
-    <!-- Coral peak dot. -->
+        android:pathData="M50,65 L57,65 L61,55 L67,75 L71,65 L78,65" />
+
+    <!-- Coral peak dot (cx78 cy52 r3.6). -->
     <path
         android:fillColor="#EA6F56"
-        android:pathData="M58,34 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 z" />
+        android:pathData="M74.4,52 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 Z" />
 </vector>

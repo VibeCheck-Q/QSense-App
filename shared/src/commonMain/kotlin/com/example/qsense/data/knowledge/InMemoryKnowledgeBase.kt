@@ -76,6 +76,50 @@ class InMemoryKnowledgeBase(
                 cause = "Loose or corroded power connection",
                 fix = "Inspect and re-terminate power wiring",
             ),
+            // Fan / fan-motor cluster (matches "Fan Motor" from the live monitoring feed).
+            KnowledgeEntry(
+                partKeywords = listOf("fan"),
+                symptom = "Fan overheating",
+                cause = "Dust buildup blocking airflow",
+                fix = "Clean fan blades and clear air vents",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("fan"),
+                symptom = "Excessive vibration",
+                cause = "Dust/debris imbalance on blades",
+                fix = "Clean and rebalance the fan",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("fan"),
+                symptom = "Grinding / bearing noise",
+                cause = "Worn fan bearing",
+                fix = "Replace the fan bearing",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("fan"),
+                symptom = "Fan will not spin",
+                cause = "Seized bearing or failed start capacitor",
+                fix = "Inspect capacitor and bearing, free or replace",
+            ),
+            // Bearing / spindle cluster (matches "Spindle Bearing").
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Bearing overheating",
+                cause = "Lubrication breakdown",
+                fix = "Re-lubricate or replace the bearing",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Excessive play / runout",
+                cause = "Worn bearing races",
+                fix = "Replace the bearing",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Vibration",
+                cause = "Shaft misalignment",
+                fix = "Realign the spindle to spec",
+            ),
         )
     }
 }

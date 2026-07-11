@@ -49,6 +49,7 @@ import com.example.qsense.domain.service.ConnectionState
 import com.example.qsense.domain.service.ModelStatus
 import com.example.qsense.presentation.brand.QSenseLogo
 import com.example.qsense.presentation.theme.QSenseColors
+import com.example.qsense.presentation.theme.classifySeverity
 import com.example.qsense.presentation.theme.humidityColor
 import com.example.qsense.presentation.theme.temperatureColor
 
@@ -170,10 +171,18 @@ private fun StatusRow(modelStatus: ModelStatus, connectionState: ConnectionState
 private fun trimNumber(value: Float): String =
     if (value % 1f == 0f) value.toInt().toString() else value.toString()
 
-private fun severityColor(severity: String): Color = when (severity.lowercase()) {
-    "high", "critical" -> QSenseColors.coral
-    "medium", "warning", "warn" -> QSenseColors.amber
-    else -> QSenseColors.slate
+/** A small pill badge showing a criticality (or RESOLVED) label in its color. */
+@Composable
+private fun Pill(label: String, color: Color) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .background(color.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    )
 }
 
 /** A small pill: colored dot + "Label value" — used for temperature/humidity readouts. */
@@ -197,7 +206,8 @@ private fun SensorChip(label: String, value: String, color: Color) {
 
 @Composable
 private fun AlertRow(item: AlertItem, selected: Boolean, onClick: () -> Unit) {
-    val accent = if (item.resolved) QSenseColors.sage else severityColor(item.alert.severity)
+    val criticality = classifySeverity(item.alert.severity)
+    val accent = if (item.resolved) QSenseColors.sage else criticality.color
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
@@ -212,17 +222,28 @@ private fun AlertRow(item: AlertItem, selected: Boolean, onClick: () -> Unit) {
             // Left accent bar in the stage color.
             Box(Modifier.width(4.dp).fillMaxHeight().background(accent))
             Column(
-                modifier = Modifier.padding(14.dp),
+                modifier = Modifier.padding(14.dp).weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${item.alert.machineNo} • ${item.alert.partName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = QSenseColors.ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (item.resolved) {
+                        Pill("RESOLVED", QSenseColors.sage)
+                    } else {
+                        Pill(criticality.label, criticality.color)
+                    }
+                }
                 Text(
-                    "${item.alert.machineNo} • ${item.alert.partName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = QSenseColors.ink,
-                )
-                Text(
-                    "Part ${item.alert.partNo} • severity ${item.alert.severity}" +
-                        if (item.resolved) " • RESOLVED" else "",
+                    "Part ${item.alert.partNo} • severity ${item.alert.severity}",
                     style = MaterialTheme.typography.bodySmall,
                     color = QSenseColors.inkSoft,
                 )

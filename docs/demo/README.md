@@ -8,7 +8,12 @@ published back over MQTT.
 - A supported Snapdragon phone (Snapdragon 8 Elite `SM8750` or 8 Elite Gen 5 `SM8850`),
   developer mode + `adb` enabled.
 - Mosquitto clients (`mosquitto_pub` / `mosquitto_sub`) on your machine.
-- A Qualcomm AI Hub / GGUF instruct-LLM bundle to side-load.
+- A chipset-matched **Qwen3-0.6B** instruct bundle to side-load (see step 1).
+
+> Note: QSense runs the model on-device via **GenieX** (Qualcomm QAIRT/Genie, `llama.cpp`/GGUF
+> runtime) — it does **not** use LiteRT/tflite. If the SoC is unsupported or the model fails,
+> the app falls back to the on-device RAG knowledge base so the operator still gets grounded
+> causes/fixes.
 
 Default broker is the public `test.mosquitto.org:1883` and topic namespace `qsense-demo`.
 This broker is **insecure** — do not send real factory data. Override host/port/namespace via
@@ -16,12 +21,18 @@ the script parameters, and set the namespace to a team-unique value to avoid col
 
 ## Steps
 
-1. **Side-load the model** to the exact path the app reads
-   (`getExternalFilesDir(null)/models/qsense-llm`):
+1. **Get + side-load the model.** Use a chipset-matched **Qwen3-0.6B** bundle — a GGUF build
+   (for the GenieX `llama.cpp` runtime) from Qualcomm AI Hub or Hugging Face
+   `qualcomm/Qwen3-0.6B`, matched to your target Snapdragon SoC. GenieX ships the QAIRT/Genie
+   shared libs itself, so no separate SDK install is needed on-device.
+
+   Push it to the exact path the app reads (`getExternalFilesDir(null)/models/qsense-llm`):
    ```
    adb push <your-bundle> /sdcard/Android/data/com.example.qsense/files/models/qsense-llm
    ```
-   If the app shows `Model: Model not found at …`, push to the path it prints.
+   The folder name (`qsense-llm`) and context size are configurable via `GenieXConfig` in
+   `shared/src/androidMain/.../di/AndroidConfig.kt`. If the app shows
+   `Model: Model not found at …`, push to the path it prints.
 
 2. **Watch resolutions** in one terminal (leave running):
    ```

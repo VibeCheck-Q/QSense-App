@@ -2,6 +2,7 @@ package com.example.qsense.data.serialization
 
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.model.Resolution
+import com.example.qsense.domain.model.ResolvedAck
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlin.test.Test
@@ -40,6 +41,18 @@ class MqttPayloadTest {
     }
 
     @Test
+    fun resolvedAckSerializesToExactMinimalPayload() {
+        assertEquals(
+            """{"alertId":"a1","resolved":true}""",
+            json.encodeToString(ResolvedAck("a1", resolved = true)),
+        )
+        assertEquals(
+            """{"alertId":"a1","resolved":false}""",
+            json.encodeToString(ResolvedAck("a1", resolved = false)),
+        )
+    }
+
+    @Test
     fun faultAlertWithSensorReadingsRoundTrips() {
         val alert = FaultAlert(
             alertId = "a1",
@@ -64,6 +77,26 @@ class MqttPayloadTest {
         val decoded = json.decodeFromString<FaultAlert>(raw)
         assertEquals(null, decoded.temperature)
         assertEquals(null, decoded.humidity)
+    }
+
+    @Test
+    fun decodesMonitoringPayloadWithNumericSeverityAndLocalTimestamp() {
+        // The canonical monitoring payload: numeric severity, microsecond local timestamp (no Z).
+        val raw = """
+            {"alertId":"e2d69c69-f6a6-4850-b76b-7912fc491e61","machineNo":"M-01",
+             "partName":"Fan Motor","partNo":"PN-001","severity":48.896,
+             "timestamp":"2026-07-11T17:57:05.435079"}
+        """.trimIndent()
+        val decoded = json.decodeFromString<FaultAlert>(raw)
+        assertEquals("Fan Motor", decoded.partName)
+        assertEquals("48.896", decoded.severity)
+        assertEquals("2026-07-11T17:57:05.435079", decoded.timestamp)
+    }
+
+    @Test
+    fun decodesStringSeverityToo() {
+        val raw = """{"alertId":"a1","machineNo":"M-1","partName":"P","partNo":"PN","severity":"high","timestamp":"2026-07-11T10:30:00Z"}"""
+        assertEquals("high", json.decodeFromString<FaultAlert>(raw).severity)
     }
 
     @Test

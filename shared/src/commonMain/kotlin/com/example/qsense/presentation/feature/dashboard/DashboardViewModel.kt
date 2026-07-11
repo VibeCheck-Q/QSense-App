@@ -63,12 +63,10 @@ class DashboardViewModel(
             // a new one — the single LlmWrapper does not support concurrent generation.
             previousJob?.cancelAndJoin()
             // Defer generation until the model finishes loading (common right after launch).
-            val status = container.textGenerator.status.first { it !is ModelStatus.Loading }
+            container.textGenerator.status.first { it !is ModelStatus.Loading }
             if (_uiState.value.selectedAlertId != alertId) return@launch
-            if (status is ModelStatus.Error) {
-                _uiState.update { it.copy(diagnosis = DiagnosisState.Error(status.message)) }
-                return@launch
-            }
+            // Even if the model errored, still run the use case — it falls back to RAG knowledge so
+            // the operator always gets grounded causes/fixes rather than an error panel.
             val result = runCatching { container.generateDiagnosisUseCase(alert.alert) }
             // Ignore if the operator has since selected a different alert.
             if (_uiState.value.selectedAlertId != alertId) return@launch

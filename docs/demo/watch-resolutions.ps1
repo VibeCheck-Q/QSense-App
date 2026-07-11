@@ -3,9 +3,9 @@
 param(
     [string]$Broker = "test.mosquitto.org",
     [int]$Port = 1883,
-    [string]$Namespace = "qsense-demo"
+    [string]$Topic = "qsense/machine/resolutions"
 )
 
-$topic = "qsense/$Namespace/resolutions"
+$topic = $Topic
 Write-Host "Subscribing to $Broker`:$Port  topic=$topic  (Ctrl+C to stop)"
 mosquitto_sub -h $Broker -p $Port -t $topic -q 1 -v

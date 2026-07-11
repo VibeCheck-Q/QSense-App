@@ -2,6 +2,7 @@ package com.example.qsense.domain.usecase
 
 import com.example.qsense.data.repository.InMemoryAlertStore
 import com.example.qsense.domain.model.FaultAlert
+import com.example.qsense.domain.model.ResolvedAck
 import com.example.qsense.testutil.FakeMqttGateway
 import com.example.qsense.testutil.FixedClock
 import kotlinx.coroutines.test.runTest
@@ -27,7 +28,22 @@ class PublishResolutionUseCaseTest {
         assertEquals("Seal degradation", published.chosenCause)
         assertEquals("Replace seal", published.appliedFix)
         assertEquals("2026-07-11T10:45:00Z", published.resolvedAt)
+        assertEquals(listOf(ResolvedAck("a1", resolved = true)), gateway.publishedAcks)
         assertTrue(store.alerts.value.first { it.alert.alertId == "a1" }.resolved)
+    }
+
+    @Test
+    fun doesNotMarkResolvedWhenAckFails() = runTest {
+        val gateway = FakeMqttGateway().apply { ackError = RuntimeException("ack rejected") }
+        val store = InMemoryAlertStore().apply { add(alert) }
+        val useCase = PublishResolutionUseCase(gateway, store, FixedClock())
+
+        assertFailsWith<RuntimeException> {
+            useCase("a1", "M-101", "HP-1", "cause", "fix", "notes")
+        }
+        // The rich resolution went out, but a failed ack must leave the alert unresolved (Approach A).
+        assertEquals(1, gateway.published.size)
+        assertFalse(store.alerts.value.first { it.alert.alertId == "a1" }.resolved)
     }
 
     @Test

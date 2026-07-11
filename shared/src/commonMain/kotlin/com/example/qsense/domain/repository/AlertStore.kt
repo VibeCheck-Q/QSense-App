@@ -8,8 +8,15 @@ import kotlinx.coroutines.flow.StateFlow
 interface AlertStore {
     val alerts: StateFlow<List<AlertItem>>
 
-    /** Adds an alert, ignoring it if one with the same alertId is already present. */
+    /**
+     * Ingests a real inbound alert. Alerts are keyed by machine + part: a new reading for the same
+     * machine/part refreshes that row in place (keeping its id + resolved state) rather than adding
+     * a duplicate. The first real alert purges any [seed]ed demo fixtures.
+     */
     fun add(alert: FaultAlert)
+
+    /** Adds a dev/demo fixture, flagged [AlertItem.seeded] so a real [add] can purge it. */
+    fun seed(alert: FaultAlert)
 
     /** Marks the alert with [alertId] as resolved, if present. */
     fun markResolved(alertId: String)

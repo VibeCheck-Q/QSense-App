@@ -3,11 +3,11 @@
 param(
     [string]$Broker = "test.mosquitto.org",
     [int]$Port = 1883,
-    [string]$Namespace = "qsense-demo"
+    [string]$Topic = "qsense/machine/monitoring"
 )
 
-$payload = '{"alertId":"a1b2c3","machineNo":"MTR-07","partName":"Blade","partNo":"BLD-330","severity":"high","timestamp":"2026-07-11T10:30:00Z","temperature":78,"humidity":82}'
-$topic = "qsense/$Namespace/alerts"
+$payload = '{"alertId":"e2d69c69-f6a6-4850-b76b-7912fc491e61","machineNo":"M-01","partName":"Fan Motor","partNo":"PN-001","severity":48.896,"timestamp":"2026-07-11T17:57:05.435079"}'
+$topic = $Topic
 
 Write-Host "Publishing to $Broker`:$Port  topic=$topic"
 mosquitto_pub -h $Broker -p $Port -t $topic -q 1 -m $payload

@@ -2,6 +2,7 @@ package com.example.qsense.testutil
 
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.model.Resolution
+import com.example.qsense.domain.model.ResolvedAck
 import com.example.qsense.domain.service.Clock
 import com.example.qsense.domain.service.ConnectionState
 import com.example.qsense.domain.service.GenerationParams
@@ -51,7 +52,9 @@ class FakeMqttGateway : MqttGateway {
     override val connectionState: StateFlow<ConnectionState> = _connectionState
 
     val published = mutableListOf<Resolution>()
+    val publishedAcks = mutableListOf<ResolvedAck>()
     var publishError: Throwable? = null
+    var ackError: Throwable? = null
 
     fun setConnectionState(state: ConnectionState) { _connectionState.value = state }
 
@@ -61,6 +64,11 @@ class FakeMqttGateway : MqttGateway {
     override suspend fun publishResolution(resolution: Resolution) {
         publishError?.let { throw it }
         published.add(resolution)
+    }
+
+    override suspend fun publishResolvedAck(ack: ResolvedAck) {
+        ackError?.let { throw it }
+        publishedAcks.add(ack)
     }
 }
 

@@ -30,10 +30,10 @@ fun createAndroidAppContainer(
         dispatcher = Dispatchers.Main.immediate,
     )
 
-    // Dev-only: seed sample alerts synchronously before ingestion/connection start, so ordering is
-    // deterministic (real inbound alerts never race the fixtures) and the dashboard is never empty.
+    // Dev-only: seed sample alerts as fixtures so the dashboard isn't empty offline. They are flagged
+    // seeded and purged automatically as soon as the first real MQTT alert arrives.
     if (config.seedSampleAlerts) {
-        SampleAlerts.all.forEach(container.alertStore::add)
+        SampleAlerts.all.forEach(container.alertStore::seed)
     }
 
     scope.launch { generator.load() }

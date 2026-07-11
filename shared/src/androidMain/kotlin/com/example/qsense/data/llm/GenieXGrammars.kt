@@ -12,12 +12,11 @@ internal object GenieXGrammars {
         OutputConstraint.DiagnosisJsonAscii -> DIAGNOSIS_JSON_ASCII
     }
 
-    // Minimal ASCII-only grammar: constrains output to single-byte printable ASCII (plus tab/CR/LF)
-    // so the model can never emit the invalid multi-byte UTF-8 that makes GenieX's native
-    // NewStringUTF abort under CheckJNI. Deliberately does NOT force the JSON structure: a heavily
-    // structured grammar masks almost every candidate token and can empty the sampler's candidate
-    // set mid-stream (the "stream error" failure). Structure instead comes from the master prompt
-    // and the tolerant JsonDiagnosisParser.
+    // ASCII-only, structurally-UNCONSTRAINED grammar. It restricts output to single-byte printable
+    // ASCII (plus tab/CR/LF) so the model can never emit the invalid multi-byte UTF-8 that aborts
+    // the GenieX JNI layer — but it does NOT force the JSON structure. A structured GBNF grammar
+    // makes this GenieX/llama.cpp build fail generation outright (ErrorCode -200101 after the first
+    // few tokens), so JSON structure is elicited by the prompt and recovered by JsonDiagnosisParser.
     private val DIAGNOSIS_JSON_ASCII: String = buildString {
         appendLine("""root ::= char+""")
         appendLine("""char ::= [\t\n\r\x20-\x7E]""")

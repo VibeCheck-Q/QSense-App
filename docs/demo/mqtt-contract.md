@@ -6,8 +6,9 @@ drive the QSense Android app, and what the app publishes back.
 > QSense v1 is **text-only**: it reacts to a *fault alert* (machine + faulty part), asks the
 > on-device GenieX LLM for likely causes/fixes, and publishes an acknowledgement when the
 > operator resolves it. There is **no telemetry/vibration/audio stream** in v1 — unlike the
-> Arduino `telemetry`/`anomaly`/`cmd` contract, QSense has just **one inbound** message
-> (alert) and **one outbound** message (resolution).
+> Arduino `telemetry`/`anomaly`/`cmd` contract, QSense has **one inbound** message (alert) and a
+> few small outbound ones: a minimal ack (`resolved:false`) when an alert arrives, and — on
+> resolve — the rich resolution plus a minimal ack (`resolved:true`).
 
 ## Connection
 
@@ -17,14 +18,16 @@ drive the QSense Android app, and what the app publishes back.
 | Port | `1883` (plain TCP) | `MqttConfig.port` |
 | Protocol | **MQTT 5**, QoS **1**, clean start, auto-reconnect | `HiveMqttGateway` |
 | Client id | `qsense-<8 hex>` (random) | `HiveMqttGateway` |
-| Namespace | `qsense-demo` | `MqttConfig.namespace` |
+| Inbound topic | `qsense/machine/monitoring` | `MqttConfig.alertsTopic` |
+| Outbound topic | `qsense/machine/resolutions` | `MqttConfig.resolutionsTopic` |
+| Outbound ack topic | `qsense/machine/ack` | `MqttConfig.ackTopic` |
 
-Topics are namespaced as `qsense/<namespace>/<kind>`. With the default namespace:
-- inbound alerts → `qsense/qsense-demo/alerts`
-- outbound resolutions → `qsense/qsense-demo/resolutions`
+- inbound alerts (the app subscribes) → `qsense/machine/monitoring`
+- outbound resolutions (the app publishes) → `qsense/machine/resolutions`
+- outbound minimal acks (the app publishes) → `qsense/machine/ack`
 
 Unlike the Arduino contract, the **machine id is a field in the payload** (`machineNo`), not part
-of the topic. All clients share the two topics above.
+of the topic. The two topics are distinct so the app never re-ingests its own resolutions.
 
 ---
 
@@ -32,18 +35,16 @@ of the topic. All clients share the two topics above.
 
 Publish here to make an alert appear in the app and trigger on-device LLM diagnosis.
 
-**Topic:** `qsense/qsense-demo/alerts`
+**Topic:** `qsense/machine/monitoring`
 **Payload (JSON, UTF-8):**
 ```json
 {
-  "alertId": "a1b2c3",
-  "machineNo": "MTR-07",
-  "partName": "Blade",
-  "partNo": "BLD-330",
-  "severity": "high",
-  "timestamp": "2026-07-11T10:30:00Z",
-  "temperature": 78,
-  "humidity": 82
+  "alertId": "e2d69c69-f6a6-4850-b76b-7912fc491e61",
+  "machineNo": "M-01",
+  "partName": "Fan Motor",
+  "partNo": "PN-001",
+  "severity": 48.896,
+  "timestamp": "2026-07-11T17:57:05.435079"
 }
 ```
 
@@ -56,8 +57,8 @@ validation):
 | `machineNo` | non-blank, ≤200 chars | shown on the dashboard |
 | `partName` | ≤200 chars | human-readable part name, fed into the LLM prompt + used to retrieve reference knowledge |
 | `partNo` | non-blank, ≤200 chars | part number, fed into the LLM prompt |
-| `severity` | ≤200 chars | **free-form** (`high`/`medium`/`low` by convention) — not an enum; drives the alert accent color |
-| `timestamp` | ISO-8601 instant | must parse, e.g. `2026-07-11T10:30:00Z` |
+| `severity` | number **or** string, ≤200 chars | accepts a numeric anomaly score (e.g. `48.896`) or a label (`high`/`medium`/`low`); decoded to a string |
+| `timestamp` | non-blank, ≤200 chars | free-form; ISO instant (`…Z`) or local date-time with microseconds (`2026-07-11T17:57:05.435079`) |
 | `temperature` | **optional** number (°C) | shown color-coded on the dashboard + fed into the prompt |
 | `humidity` | **optional** number (%) | shown color-coded on the dashboard + fed into the prompt |
 
@@ -68,13 +69,13 @@ validation):
 When the operator picks the real cause/fix, adds notes, and taps **Resolve**, the app publishes
 here (QoS 1). The alert is only marked resolved locally **after the broker PUBACK**.
 
-**Topic:** `qsense/qsense-demo/resolutions`
+**Topic:** `qsense/machine/resolutions`
 **Payload (JSON, UTF-8):**
 ```json
 {
-  "alertId": "a1b2c3",
-  "machineNo": "M-101",
-  "partNo": "HP-2045",
+  "alertId": "e2d69c69-f6a6-4850-b76b-7912fc491e61",
+  "machineNo": "M-01",
+  "partNo": "PN-001",
   "chosenCause": "Seal worn beyond tolerance",
   "appliedFix": "Replaced shaft seal and refilled hydraulic fluid",
   "notes": "Also observed minor weeping at the fitting",
@@ -91,8 +92,34 @@ here (QoS 1). The alert is only marked resolved locally **after the broker PUBAC
 | `notes` | free-text operator notes (may be empty) |
 | `resolvedAt` | ISO-8601 instant the operator resolved it |
 
-Subscribe to `qsense/qsense-demo/resolutions` on your hub/Arduino to "close the loop" (e.g. clear
+Subscribe to `qsense/machine/resolutions` on your hub/Arduino to "close the loop" (e.g. clear
 the fault, reset a baseline).
+
+---
+
+## 3. Resolved Ack (outbound — the app also publishes this)
+
+A minimal status signal on `qsense/machine/ack` for subscribers that only need "is this alert
+done", without parsing the full resolution. `resolved` is a JSON **boolean**:
+
+- **When an alert arrives** the app publishes `resolved: false` (best-effort — a failed ack never
+  drops the alert).
+- **When the operator resolves it** the app publishes `resolved: true` (QoS 1, PUBACK-bound, sent
+  alongside the rich resolution; both must succeed or the alert stays unresolved).
+
+**Topic:** `qsense/machine/ack`
+**Payload (JSON, UTF-8):**
+```json
+{
+  "alertId": "e2d69c69-f6a6-4850-b76b-7912fc491e61",
+  "resolved": true
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `alertId` | echoes the alert |
+| `resolved` | `false` on arrival, `true` once resolved |
 
 ---
 
@@ -101,11 +128,11 @@ the fault, reset a baseline).
 ```bash
 # Publish a fault alert (Linux/macOS)
 mosquitto_pub -h test.mosquitto.org -p 1883 -q 1 \
-  -t qsense/qsense-demo/alerts \
-  -m '{"alertId":"a1b2c3","machineNo":"MTR-07","partName":"Blade","partNo":"BLD-330","severity":"high","timestamp":"2026-07-11T10:30:00Z","temperature":78,"humidity":82}'
+  -t qsense/machine/monitoring \
+  -m '{"alertId":"e2d69c69-f6a6-4850-b76b-7912fc491e61","machineNo":"M-01","partName":"Fan Motor","partNo":"PN-001","severity":48.896,"timestamp":"2026-07-11T17:57:05.435079"}'
 
-# Watch resolutions come back
-mosquitto_sub -h test.mosquitto.org -p 1883 -q 1 -t qsense/qsense-demo/resolutions -v
+# Watch resolutions + acks come back
+mosquitto_sub -h test.mosquitto.org -p 1883 -q 1 -t qsense/machine/resolutions -t qsense/machine/ack -v
 ```
 
 Ready-made scripts: `docs/demo/publish-alert.{sh,ps1}` and `docs/demo/watch-resolutions.{sh,ps1}`.

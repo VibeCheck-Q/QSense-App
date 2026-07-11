@@ -2,6 +2,7 @@ package com.example.qsense.domain.service
 
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.model.Resolution
+import com.example.qsense.domain.model.ResolvedAck
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -18,4 +19,7 @@ interface MqttGateway {
 
     /** Publishes [resolution]; returns only once the broker acknowledges (PUBACK). */
     suspend fun publishResolution(resolution: Resolution)
+
+    /** Publishes the minimal [ack] on the ack topic; returns only once the broker PUBACKs. */
+    suspend fun publishResolvedAck(ack: ResolvedAck)
 }
