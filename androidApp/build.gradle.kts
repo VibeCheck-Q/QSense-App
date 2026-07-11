@@ -14,6 +14,7 @@ kotlin {
 dependencies {
     implementation(projects.shared)
 
+    implementation(libs.compose.material3)
     implementation(libs.androidx.activity.compose)
 
     implementation(libs.compose.uiToolingPreview)
@@ -34,6 +35,14 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += listOf("META-INF/INDEX.LIST", "META-INF/io.netty.versions.properties")
+        }
+        jniLibs {
+            // GenieX's plugin manager resolves libgeniex_plugin_*.so via a File lookup in the
+            // app's on-disk nativeLibraryDir. AGP's default (extractNativeLibs=false) keeps the
+            // .so packed inside the APK, leaving that dir empty, so the llama_cpp/qairt plugins
+            // fail to load. Force extraction so the plugin libs land on disk.
+            useLegacyPackaging = true
         }
     }
     buildTypes {
