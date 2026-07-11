@@ -43,12 +43,12 @@ class MqttPayloadTest {
     @Test
     fun resolvedAckSerializesToExactMinimalPayload() {
         assertEquals(
-            """{"alertId":"a1","resolved":true}""",
-            json.encodeToString(ResolvedAck("a1", resolved = true)),
+            """{"alertId":"a1","resolved":1}""",
+            json.encodeToString(ResolvedAck("a1", resolved = 1)),
         )
         assertEquals(
-            """{"alertId":"a1","resolved":false}""",
-            json.encodeToString(ResolvedAck("a1", resolved = false)),
+            """{"alertId":"a1","resolved":0}""",
+            json.encodeToString(ResolvedAck("a1", resolved = 0)),
         )
     }
 

@@ -22,7 +22,10 @@ cards, and Clash Display + Satoshi fonts.
   knowledge/sensor-grounded user message), tolerant LLM parser, Compose dashboard +
   `DashboardViewModel`, theme (`AppTheme`, `QSenseColors`, `buildQSenseTypography`, sensor colors),
   the `QSenseLogo` (the round badge — navy disc + white ticks/meter box/ECG waveform + coral dot —
-  drawn in Compose Canvas), and `AppContainer` (constructor-injected class).
+  drawn in Compose Canvas; optional `waveProgress`/`dotScale` animate the draw-in), the onboarding
+  flow (`presentation/feature/onboarding` — animated `SplashScreen` then a placeholder `LoginScreen`),
+  and `AppContainer` (constructor-injected class). `App(container, typography)` runs a Crossfade nav:
+  Splash → Login (any credentials proceed; no real auth in v1) → the live Dashboard.
 - `shared/androidMain` — the Android-only adapters behind those interfaces:
   `GenieXTextGenerator` (GenieX SDK), `HiveMqttGateway` (HiveMQ), `SystemClock`, plus
   `createAndroidAppContainer(context, scope, config)`.
@@ -62,11 +65,14 @@ the ViewModel via `viewModel { DashboardViewModel(container) }`.
     structure comes from the `SYSTEM` prompt + the tolerant `JsonDiagnosisParser`.
 - **RAG grounding + fallback**: `InMemoryKnowledgeBase` (commonMain, pure keyword lookup on part
   name — no embeddings) returns known symptom→cause→fix entries; `GenerateDiagnosisUseCase` injects
-  them into the prompt. If the on-device model fails (GenieX stream error) or returns unparseable
+  them into the prompt. The prompt frames the task as **select-and-adapt over the retrieved
+  reference issues** (rank the most relevant, rewrite for this machine/part/sensor) rather than free
+  invention, which a small model handles more reliably. If the on-device model fails (GenieX stream error) or returns unparseable
   text, the use case **falls back to those retrieved entries** as the diagnosis, so the operator
   always gets grounded causes/fixes. NOTE: the side-loaded Qwen3-0.6B is too small to reliably emit
   structured JSON on device (often emits a stray token then stops), so in practice the RAG fallback
-  usually carries the diagnosis — a larger instruct model would let the LLM path dominate.
+  usually carries the diagnosis — a larger instruct model would let the LLM path dominate (see
+  `docs/reports/2026-07-12-on-device-llm-iteration.md`).
 - **Alerts**: keyed by `machineNo + partNo`. The monitoring feed re-sends the same machine/part with
   a fresh `alertId`, so `InMemoryAlertStore.add` refreshes that row in place (stable id + resolved
   flag) instead of duplicating. `seed(...)` adds demo fixtures flagged `seeded`; the first real
@@ -75,9 +81,9 @@ the ViewModel via `viewModel { DashboardViewModel(container) }`.
   drives the alert accent bar + badge.
 - **MQTT** (`com.hivemq:hivemq-mqtt-client:1.3.15`). MQTT 5, QoS 1. Inbound alerts on
   `qsense/machine/monitoring`. The app also emits a minimal `ResolvedAck`
-  (`{"alertId","resolved":<bool>}`) on `qsense/machine/ack`: `resolved:false` when an alert arrives
-  (best-effort, in `IngestAlertsUseCase` — a failed ack never drops the alert) and `resolved:true`
-  on resolve. On resolve it publishes **two** messages — the rich `Resolution` on
+  (`{"alertId","resolved":<0|1>}`, `resolved` a number) on `qsense/machine/ack`: `resolved:0` when
+  an alert arrives (best-effort, in `IngestAlertsUseCase` — a failed ack never drops the alert) and
+  `resolved:1` on resolve. On resolve it publishes **two** messages — the rich `Resolution` on
   `qsense/machine/resolutions` then the `true` ack — both PUBACK-bound and required, so the alert is
   marked locally resolved only after **both** succeed and a failure in either leaves it unresolved
   (`PublishResolutionUseCase`). Topics are distinct so the app never re-ingests its own acks; all

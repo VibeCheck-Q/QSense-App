@@ -34,7 +34,7 @@ class PublishResolutionUseCase(
             resolvedAt = clock.nowIso(),
         )
         mqttGateway.publishResolution(resolution)
-        mqttGateway.publishResolvedAck(ResolvedAck(alertId, resolved = true))
+        mqttGateway.publishResolvedAck(ResolvedAck(alertId, resolved = 1))
         alertStore.markResolved(alertId)
     }
 }

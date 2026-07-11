@@ -14,7 +14,7 @@ class IngestAlertsUseCase(
             alertStore.add(alert)
             // Best-effort: announce the freshly-arrived alert as unresolved. A failed ack must
             // never drop the alert, so unlike the resolve path this is not PUBACK-gated.
-            runCatching { mqttGateway.publishResolvedAck(ResolvedAck(alert.alertId, resolved = false)) }
+            runCatching { mqttGateway.publishResolvedAck(ResolvedAck(alert.alertId, resolved = 0)) }
         }
     }
 }

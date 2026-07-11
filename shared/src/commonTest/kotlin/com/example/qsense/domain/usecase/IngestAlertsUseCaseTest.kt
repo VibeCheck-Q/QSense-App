@@ -27,7 +27,7 @@ class IngestAlertsUseCaseTest {
         advanceUntilIdle()
 
         assertTrue(store.alerts.value.any { it.alert.alertId == "a1" })
-        assertEquals(listOf(ResolvedAck("a1", resolved = false)), gateway.publishedAcks)
+        assertEquals(listOf(ResolvedAck("a1", resolved = 0)), gateway.publishedAcks)
         job.cancel()
     }
 

@@ -7,8 +7,8 @@ drive the QSense Android app, and what the app publishes back.
 > on-device GenieX LLM for likely causes/fixes, and publishes an acknowledgement when the
 > operator resolves it. There is **no telemetry/vibration/audio stream** in v1 — unlike the
 > Arduino `telemetry`/`anomaly`/`cmd` contract, QSense has **one inbound** message (alert) and a
-> few small outbound ones: a minimal ack (`resolved:false`) when an alert arrives, and — on
-> resolve — the rich resolution plus a minimal ack (`resolved:true`).
+> few small outbound ones: a minimal ack (`resolved:0`) when an alert arrives, and — on
+> resolve — the rich resolution plus a minimal ack (`resolved:1`).
 
 ## Connection
 
@@ -39,7 +39,7 @@ Publish here to make an alert appear in the app and trigger on-device LLM diagno
 **Payload (JSON, UTF-8):**
 ```json
 {
-  "alertId": "e2d69c69-f6a6-4850-b76b-7912fc491e61",
+  "alertId": "M-01",
   "machineNo": "M-01",
   "partName": "Fan Motor",
   "partNo": "PN-001",
@@ -53,7 +53,7 @@ validation):
 
 | Field | Rule | Notes |
 |---|---|---|
-| `alertId` | non-blank, ≤200 chars | dedupe key — reuse the same id to update, use a new id per fault |
+| `alertId` | non-blank, ≤200 chars | a fixed per-device id (equal to the machine number, e.g. `M-01`); the app also keys the same machine/part in place, so a stable id is expected |
 | `machineNo` | non-blank, ≤200 chars | shown on the dashboard |
 | `partName` | ≤200 chars | human-readable part name, fed into the LLM prompt + used to retrieve reference knowledge |
 | `partNo` | non-blank, ≤200 chars | part number, fed into the LLM prompt |
@@ -73,7 +73,7 @@ here (QoS 1). The alert is only marked resolved locally **after the broker PUBAC
 **Payload (JSON, UTF-8):**
 ```json
 {
-  "alertId": "e2d69c69-f6a6-4850-b76b-7912fc491e61",
+  "alertId": "M-01",
   "machineNo": "M-01",
   "partNo": "PN-001",
   "chosenCause": "Seal worn beyond tolerance",
@@ -100,26 +100,26 @@ the fault, reset a baseline).
 ## 3. Resolved Ack (outbound — the app also publishes this)
 
 A minimal status signal on `qsense/machine/ack` for subscribers that only need "is this alert
-done", without parsing the full resolution. `resolved` is a JSON **boolean**:
+done", without parsing the full resolution. `resolved` is a JSON **number** (`0`/`1`):
 
-- **When an alert arrives** the app publishes `resolved: false` (best-effort — a failed ack never
+- **When an alert arrives** the app publishes `resolved: 0` (best-effort — a failed ack never
   drops the alert).
-- **When the operator resolves it** the app publishes `resolved: true` (QoS 1, PUBACK-bound, sent
+- **When the operator resolves it** the app publishes `resolved: 1` (QoS 1, PUBACK-bound, sent
   alongside the rich resolution; both must succeed or the alert stays unresolved).
 
 **Topic:** `qsense/machine/ack`
 **Payload (JSON, UTF-8):**
 ```json
 {
-  "alertId": "e2d69c69-f6a6-4850-b76b-7912fc491e61",
-  "resolved": true
+  "alertId": "M-01",
+  "resolved": 1
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `alertId` | echoes the alert |
-| `resolved` | `false` on arrival, `true` once resolved |
+| `alertId` | echoes the alert (a fixed per-device id, equal to the machine number) |
+| `resolved` | `0` on arrival, `1` once resolved |
 
 ---
 
@@ -129,7 +129,7 @@ done", without parsing the full resolution. `resolved` is a JSON **boolean**:
 # Publish a fault alert (Linux/macOS)
 mosquitto_pub -h test.mosquitto.org -p 1883 -q 1 \
   -t qsense/machine/monitoring \
-  -m '{"alertId":"e2d69c69-f6a6-4850-b76b-7912fc491e61","machineNo":"M-01","partName":"Fan Motor","partNo":"PN-001","severity":48.896,"timestamp":"2026-07-11T17:57:05.435079"}'
+  -m '{"alertId":"M-01","machineNo":"M-01","partName":"Fan Motor","partNo":"PN-001","severity":48.896,"timestamp":"2026-07-11T17:57:05.435079"}'
 
 # Watch resolutions + acks come back
 mosquitto_sub -h test.mosquitto.org -p 1883 -q 1 -t qsense/machine/resolutions -t qsense/machine/ack -v

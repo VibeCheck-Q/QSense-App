@@ -28,7 +28,7 @@ class PublishResolutionUseCaseTest {
         assertEquals("Seal degradation", published.chosenCause)
         assertEquals("Replace seal", published.appliedFix)
         assertEquals("2026-07-11T10:45:00Z", published.resolvedAt)
-        assertEquals(listOf(ResolvedAck("a1", resolved = true)), gateway.publishedAcks)
+        assertEquals(listOf(ResolvedAck("a1", resolved = 1)), gateway.publishedAcks)
         assertTrue(store.alerts.value.first { it.alert.alertId == "a1" }.resolved)
     }
 
