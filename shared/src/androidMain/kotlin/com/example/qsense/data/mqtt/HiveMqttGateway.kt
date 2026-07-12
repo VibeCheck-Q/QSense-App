@@ -6,6 +6,8 @@ import com.example.qsense.di.MqttConfig
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.model.Resolution
 import com.example.qsense.domain.model.ResolvedAck
+import com.example.qsense.domain.model.VisionRequest
+import com.example.qsense.domain.model.VisionResponse
 import com.example.qsense.domain.service.ConnectionState
 import com.example.qsense.domain.service.MqttGateway
 import com.hivemq.client.mqtt.MqttClient
@@ -43,6 +45,10 @@ class HiveMqttGateway(
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
+    // replay = 1 so a response arriving just before the collector subscribes is not lost.
+    private val _visionResponses = MutableSharedFlow<VisionResponse>(replay = 1, extraBufferCapacity = 16)
+    override val visionResponses: Flow<VisionResponse> = _visionResponses.asSharedFlow()
+
     private val client: Mqtt5AsyncClient = run {
         var builder = MqttClient.builder()
             .useMqttVersion5()
@@ -59,8 +65,9 @@ class HiveMqttGateway(
             .automaticReconnectWithDefaultConfig()
             .addConnectedListener {
                 Log.i(TAG, "connected to ${config.host}:${config.port}; subscribing")
-                // Connected is reported only after the subscription is acknowledged (see below).
+                // Connected is reported only after the alerts subscription is acknowledged (see below).
                 subscribeToAlerts()
+                subscribeToVisionResponses()
             }
             .addDisconnectedListener { ctx ->
                 Log.w(TAG, "disconnected (source=${ctx.source}): ${ctx.cause}", ctx.cause)
@@ -119,6 +126,43 @@ class HiveMqttGateway(
         }
         result.error.ifPresent { throw it }
         Unit
+    }
+
+    override suspend fun publishVisionRequest(request: VisionRequest) = withContext(io) {
+        val payload = JsonProviders.strict.encodeToString(request)
+            .toByteArray(Charsets.UTF_8)
+        val result = withTimeout(config.publishTimeoutMs) {
+            client.publishWith()
+                .topic(config.visionRequestTopic)
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .payload(payload)
+                .send()
+                .await()
+        }
+        result.error.ifPresent { throw it }
+        Unit
+    }
+
+    private fun subscribeToVisionResponses() {
+        client.subscribeWith()
+            .topicFilter(config.visionResponseTopic)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .callback { publish ->
+                runCatching {
+                    val json = String(publish.payloadAsBytes, Charsets.UTF_8)
+                    JsonProviders.strict.decodeFromString<VisionResponse>(json)
+                }.onSuccess { _visionResponses.tryEmit(it) }
+                    .onFailure { Log.w(TAG, "bad vision response", it) }
+            }
+            .send()
+            .whenComplete { subAck, throwable ->
+                when {
+                    throwable != null -> Log.e(TAG, "vision subscribe failed", throwable)
+                    subAck.reasonCodes.any { it.isError } ->
+                        Log.e(TAG, "vision subscription denied: ${subAck.reasonCodes}")
+                    else -> Log.i(TAG, "subscribed to ${config.visionResponseTopic}")
+                }
+            }
     }
 
     private fun subscribeToAlerts() {

@@ -22,6 +22,9 @@ data class MqttConfig(
     val resolutionsTopic: String = "qsense/machine/resolutions",
     // Outbound minimal ack topic, published alongside the rich resolution on every resolve.
     val ackTopic: String = "qsense/machine/ack",
+    // Vision (v2): outbound image requests + inbound annotated responses (PC service processes them).
+    val visionRequestTopic: String = "qsense/vision/request",
+    val visionResponseTopic: String = "qsense/vision/response",
     val publishTimeoutMs: Long = 10_000,
 )
 

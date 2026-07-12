@@ -3,6 +3,8 @@ package com.example.qsense.testutil
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.model.Resolution
 import com.example.qsense.domain.model.ResolvedAck
+import com.example.qsense.domain.model.VisionRequest
+import com.example.qsense.domain.model.VisionResponse
 import com.example.qsense.domain.service.Clock
 import com.example.qsense.domain.service.ConnectionState
 import com.example.qsense.domain.service.GenerationParams
@@ -51,10 +53,15 @@ class FakeMqttGateway : MqttGateway {
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Connected)
     override val connectionState: StateFlow<ConnectionState> = _connectionState
 
+    val visionResponsesFlow = MutableSharedFlow<VisionResponse>(replay = 1, extraBufferCapacity = 16)
+    override val visionResponses: Flow<VisionResponse> = visionResponsesFlow
+
     val published = mutableListOf<Resolution>()
     val publishedAcks = mutableListOf<ResolvedAck>()
+    val publishedVisionRequests = mutableListOf<VisionRequest>()
     var publishError: Throwable? = null
     var ackError: Throwable? = null
+    var visionError: Throwable? = null
 
     fun setConnectionState(state: ConnectionState) { _connectionState.value = state }
 
@@ -69,6 +76,11 @@ class FakeMqttGateway : MqttGateway {
     override suspend fun publishResolvedAck(ack: ResolvedAck) {
         ackError?.let { throw it }
         publishedAcks.add(ack)
+    }
+
+    override suspend fun publishVisionRequest(request: VisionRequest) {
+        visionError?.let { throw it }
+        publishedVisionRequests.add(request)
     }
 }
 
