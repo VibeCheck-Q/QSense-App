@@ -27,7 +27,16 @@ class DashboardViewModel(
         // Alerts, model status, and connection state are collected into UI state.
         viewModelScope.launch(container.dispatcher) {
             container.observeAlertsUseCase().collect { alerts ->
-                _uiState.update { it.copy(alerts = alerts) }
+                _uiState.update { state ->
+                    // If the selected alert recurred (reset to unresolved) after we'd resolved it,
+                    // clear the stale "resolved" banner so the operator can resolve it again.
+                    val reactivated = state.resolve is ResolveState.Done &&
+                        alerts.firstOrNull { it.alert.alertId == state.selectedAlertId }?.resolved == false
+                    state.copy(
+                        alerts = alerts,
+                        resolve = if (reactivated) ResolveState.Idle else state.resolve,
+                    )
+                }
             }
         }
         viewModelScope.launch(container.dispatcher) {

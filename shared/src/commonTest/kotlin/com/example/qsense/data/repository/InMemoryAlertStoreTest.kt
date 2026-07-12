@@ -45,4 +45,17 @@ class InMemoryAlertStoreTest {
         store.markResolved("id-1")
         assertTrue(store.alerts.value.single().resolved)
     }
+
+    @Test
+    fun reSentAlertReactivatesAResolvedSite() {
+        val store = InMemoryAlertStore()
+        store.add(alert("M-01", "M-01", "Fan Motor", "50"))
+        store.markResolved("M-01")
+        assertTrue(store.alerts.value.single().resolved, "should be resolved after markResolved")
+
+        // The same fault recurs (re-sent) — it must show active again, not stay resolved.
+        store.add(alert("M-01", "M-01", "Fan Motor", "55"))
+        assertFalse(store.alerts.value.single().resolved, "a recurring alert must clear the resolved flag")
+        assertEquals("55", store.alerts.value.single().alert.severity)
+    }
 }

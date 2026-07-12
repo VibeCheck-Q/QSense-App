@@ -23,11 +23,13 @@ class InMemoryAlertStore : AlertStore {
             val live = current.filterNot { it.seeded }
             val idx = live.indexOfFirst { key(it.alert) == key(alert) }
             if (idx >= 0) {
-                // Same machine/part: refresh the reading in place, keeping the original id (so the
-                // selection stays stable while the feed streams) and the resolved flag.
+                // Same machine/part: refresh the reading in place, keeping the original id so the
+                // selection stays stable. A newly-arrived alert is treated as a fresh occurrence, so
+                // the resolved flag is cleared — a fault that recurs after being resolved shows
+                // active again (rather than staying stuck on RESOLVED).
                 val existing = live[idx]
                 val refreshed = alert.copy(alertId = existing.alert.alertId)
-                live.toMutableList().also { it[idx] = existing.copy(alert = refreshed) }
+                live.toMutableList().also { it[idx] = existing.copy(alert = refreshed, resolved = false) }
             } else {
                 live + AlertItem(alert)
             }

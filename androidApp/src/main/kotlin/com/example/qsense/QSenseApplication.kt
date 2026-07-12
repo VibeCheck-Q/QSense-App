@@ -1,7 +1,6 @@
 package com.example.qsense
 
 import android.app.Application
-import android.content.pm.ApplicationInfo
 import com.example.qsense.di.AndroidConfig
 import com.example.qsense.di.AppContainer
 import com.example.qsense.di.createAndroidAppContainer
@@ -18,12 +17,14 @@ class QSenseApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Seed dev sample alerts only in debuggable builds (never in release).
-        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        // No sample seeding: the seeded fixture (M-01 / Fan Motor) collides with the real device id
+        // and reappears as unresolved after a restart (the in-memory store is cleared on restart by
+        // design), which reads as "the resolved alert came back". The dashboard is now driven only by
+        // real MQTT alerts. Flip seedSampleAlerts=true only for an offline (no-broker) demo.
         container = createAndroidAppContainer(
             this,
             appScope,
-            AndroidConfig(seedSampleAlerts = debuggable),
+            AndroidConfig(seedSampleAlerts = false),
         )
     }
 }
