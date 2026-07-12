@@ -1,5 +1,7 @@
 package com.example.qsense.di
 
+import com.example.qsense.data.llm.Backend
+
 /** Runtime configuration for the Android adapters. Tweak for the demo environment. */
 data class AndroidConfig(
     val mqtt: MqttConfig = MqttConfig(),
@@ -31,8 +33,17 @@ data class MqttConfig(
 )
 
 data class GenieXConfig(
-    // Model bundle folder name under getExternalFilesDir(null)/models/, and its registry id.
+    // GGUF (llama.cpp/CPU) bundle folder under getExternalFilesDir(null)/models/, and its registry id.
     val modelName: String = "qsense-llm",
+    // QAIRT/NPU bundle folder (QNN context binary + tokenizer + genie-config), side-loaded alongside
+    // the GGUF. Used only on supported Snapdragon SoCs.
+    val qnnModelName: String = "qsense-llm-qnn",
+    // Which runtime to drive. AUTO picks QAIRT on a supported chip when the QNN bundle is present,
+    // else the llama.cpp/GGUF path. Force a value to pin the backend for a demo.
+    val backend: Backend = Backend.AUTO,
+    // SoC model substrings eligible for the QAIRT/NPU path (8 Elite / 8 Elite Gen 5). Matched
+    // case-insensitively against Build.SOC_MODEL.
+    val qnnChipsets: Set<String> = setOf("SM8750", "SM8850"),
     val nCtx: Int = 4096,
     val generationTimeoutMs: Long = 60_000,
 )

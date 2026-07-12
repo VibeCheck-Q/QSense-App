@@ -21,18 +21,30 @@ the script parameters, and set the namespace to a team-unique value to avoid col
 
 ## Steps
 
-1. **Get + side-load the model.** Use a chipset-matched **Qwen3-0.6B** bundle — a GGUF build
-   (for the GenieX `llama.cpp` runtime) from Qualcomm AI Hub or Hugging Face
-   `qualcomm/Qwen3-0.6B`, matched to your target Snapdragon SoC. GenieX ships the QAIRT/Genie
-   shared libs itself, so no separate SDK install is needed on-device.
+1. **Get + side-load the model.** Use a chipset-matched **Qwen3-0.6B** bundle. GenieX ships the
+   llama.cpp **and** QAIRT/Genie shared libs itself, so no separate SDK install is needed on-device.
+   The app picks its runtime automatically (`GenieXConfig.backend = AUTO`): **QAIRT/NPU** on
+   Snapdragon 8 Elite (SM8750) / 8 Elite Gen 5 (SM8850) if a QNN bundle is present, else the
+   **llama.cpp/GGUF** path on CPU. Side-load whichever bundle(s) you have — both may coexist.
 
-   Push it to the exact path the app reads (`getExternalFilesDir(null)/models/qsense-llm`):
+   **GGUF (llama.cpp/CPU — works on any arm64 device):** a GGUF build from Qualcomm AI Hub or
+   Hugging Face `qualcomm/Qwen3-0.6B`. Push to `getExternalFilesDir(null)/models/qsense-llm`:
    ```
-   adb push <your-bundle> /sdcard/Android/data/com.example.qsense/files/models/qsense-llm
+   adb push <gguf-bundle> /sdcard/Android/data/com.example.qsense/files/models/qsense-llm
    ```
-   The folder name (`qsense-llm`) and context size are configurable via `GenieXConfig` in
-   `shared/src/androidMain/.../di/AndroidConfig.kt`. If the app shows
-   `Model: Model not found at …`, push to the path it prints.
+
+   **QNN (QAIRT/NPU — 8 Elite / 8 Elite Gen 5 only):** a Qwen3-0.6B **QNN context bundle**
+   compiled for Hexagon v79/v81 via Qualcomm AI Hub (the bundle folder must contain the QNN
+   context binary, the tokenizer, and any `genie-config` the runtime needs). Push to
+   `getExternalFilesDir(null)/models/qsense-llm-qnn`:
+   ```
+   adb push <qnn-bundle> /sdcard/Android/data/com.example.qsense/files/models/qsense-llm-qnn
+   ```
+
+   Both folder names, the backend preference, and context size are configurable via `GenieXConfig`
+   in `shared/src/androidMain/.../di/AndroidConfig.kt` (force `backend = QAIRT` or `LLAMA_CPP` to
+   pin one). On AUTO, if QAIRT fails to load it retries the GGUF path, then falls back to RAG. If
+   the app shows `Model: Model not found at …`, push to the path it prints.
 
 2. **Watch resolutions** in one terminal (leave running):
    ```

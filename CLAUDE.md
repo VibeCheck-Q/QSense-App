@@ -43,26 +43,37 @@ the ViewModel via `viewModel { DashboardViewModel(container) }`.
 
 ## Key integration facts
 
-- **On-device runtime is GenieX only — no LiteRT/tflite.** The single on-device LLM path is
-  GenieX (Qualcomm QAIRT/Genie, `llama.cpp`/GGUF); LiteRT/MediaPipe is intentionally not used
-  (it can't load the GGUF model). Non-Snapdragon devices are covered by the RAG fallback, not a
-  second runtime.
+- **On-device runtime is GenieX only — no LiteRT/tflite.** The on-device LLM path is GenieX,
+  which drives one of two backends (QAIRT/NPU or `llama.cpp`/GGUF; see below); LiteRT/MediaPipe is
+  intentionally not used (it can't load the GGUF model). Devices with neither a usable backend nor
+  a side-loaded model are covered by the RAG fallback.
 - **GenieX** (`com.qualcomm.qti:geniex-android:0.3.1`, resolves from mavenCentral). Package
-  `com.geniex.sdk`. Runs only on Snapdragon 8 Elite (`SM8750`) / 8 Elite Gen 5 (`SM8850`).
-  Ships arm64-v8a native libs (no NDK). All SDK use is confined to `GenieXTextGenerator`;
-  failures surface as `ModelStatus.Error` so the rest of the app still runs.
-  - Model is **side-loaded** (not in the APK) to
-    `getExternalFilesDir(null)/models/qsense-llm` — see `docs/demo/README.md`.
-  - Flow: `GenieXSdk.getInstance().init(ctx, cb)` → `registerPlugin(PLUGIN_ID_LLAMA_CPP)` →
-    `ModelManagerWrapper.init/pullFlow(LOCALFS)/getPaths` → `LlmWrapper.builder()…build()` →
-    `applyChatTemplate` (a `system` master prompt + the `user` message) → `generateStreamFlow`
-    (accumulate `LlmStreamResult.Token`).
-  - **Output constraint**: diagnosis generation always sends a GBNF grammar (`GenieXGrammars`) that
-    restricts output to single-byte printable ASCII (`root ::= char+`, `char ::= [\t\n\r\x20-\x7E]`).
-    This is the crash guarantee — ASCII-only bytes never trip the GenieX JNI `NewStringUTF` abort on
-    invalid UTF-8. It deliberately does **not** force the JSON structure (a heavily structured
-    grammar masks nearly every candidate token and empties the sampler mid-stream → `stream error`);
-    structure comes from the `SYSTEM` prompt + the tolerant `JsonDiagnosisParser`.
+  `com.geniex.sdk`. Ships arm64-v8a native libs (no NDK) for **both** the `llama.cpp` plugin
+  **and** the QAIRT/QNN plugin + Hexagon skel libs (`libQnnHtpV79Skel.so`/`V81` for SM8750/SM8850).
+  All SDK use is confined to `GenieXTextGenerator`; failures surface as `ModelStatus.Error` so the
+  rest of the app still runs.
+  - **Dual backend, chosen at load by the pure `selectBackend` (`GenieXBackend.kt`)**:
+    `Backend.AUTO` (default) picks **QAIRT** (Hexagon NPU, `ComputeUnitValue.HYBRID`) on
+    `SM8750`/`SM8850` when a QNN bundle is present, else **LLAMA_CPP** (GGUF on CPU) on any arm64
+    device. `GenieXConfig.backend` can force either. On AUTO, if QAIRT fails to build it retries
+    LLAMA_CPP, then the app falls back to RAG. Eligible chipsets are `GenieXConfig.qnnChipsets`
+    (matched case-insensitively against `Build.SOC_MODEL`).
+  - Models are **side-loaded** (not in the APK): GGUF → `getExternalFilesDir(null)/models/qsense-llm`,
+    QNN context bundle → `…/models/qsense-llm-qnn` (`GenieXConfig.modelName`/`qnnModelName`). See
+    `docs/demo/README.md`.
+  - Flow: `GenieXSdk.getInstance().init(ctx, cb)` → `registerPlugin(PLUGIN_ID_LLAMA_CPP` **or**
+    `PLUGIN_ID_QAIRT)` → `ModelManagerWrapper.init/pullFlow(LOCALFS)/getPaths` →
+    `LlmCreateInput(…, RuntimeIdValue.{LLAMA_CPP|QAIRT}.value, {null|HYBRID})` →
+    `LlmWrapper.builder()…build()` → `applyChatTemplate` (a `system` master prompt + the `user`
+    message) → `generateStreamFlow` (accumulate `LlmStreamResult.Token`).
+  - **Output constraint (llama.cpp only)**: on the LLAMA_CPP backend, diagnosis generation sends a
+    GBNF grammar (`GenieXGrammars`) restricting output to single-byte printable ASCII
+    (`root ::= char+`, `char ::= [\t\n\r\x20-\x7E]`) — the crash guarantee so ASCII-only bytes never
+    trip the llama.cpp JNI `NewStringUTF` abort on invalid UTF-8. It deliberately does **not** force
+    JSON structure (a heavily structured grammar masks nearly every candidate token and empties the
+    sampler mid-stream → `stream error`); structure comes from the `SYSTEM` prompt + the tolerant
+    `JsonDiagnosisParser`. GBNF is a llama.cpp feature, so the **QAIRT path omits it** and relies on
+    the prompt + parser + RAG fallback.
 - **RAG grounding + fallback**: `InMemoryKnowledgeBase` (commonMain, pure keyword lookup on part
   name — no embeddings) returns known symptom→cause→fix entries; `GenerateDiagnosisUseCase` injects
   them into the prompt. The prompt frames the task as **select-and-adapt over the retrieved
