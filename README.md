@@ -1,5 +1,9 @@
 # QSense — Maintenance Assistant
 
+<p align="center">
+  <img src="docs/screenshots/qsense-repair-flow-banner.jpg" alt="QSense — repair guidance generated on the phone: a local LLM turns an MQTT alert into ranked causes and fixes, then the resolution closes the loop back to the floor" width="100%">
+</p>
+
 **On-device predictive maintenance.** A fault alert arrives over MQTT, relevant failure modes are
 retrieved from an on-device knowledge base, an on-device LLM turns them into ranked causes & fixes,
 the operator picks one and resolves it — all on the phone, no cloud round-trip.
