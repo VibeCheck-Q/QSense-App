@@ -96,6 +96,30 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun stillFaultingMachineIsNotAutoDismissed() = runTest(dispatcher) {
+        val store = InMemoryAlertStore().apply { add(alert) } // "high" → CRITICAL
+        val gateway = FakeMqttGateway()
+        val vm = DashboardViewModel(container(gateway = gateway, store = store))
+        advanceUntilIdle()
+
+        vm.onSelectAlert("a1")
+        advanceUntilIdle()
+        vm.onSelectCause(0)
+        vm.onFixConfirmedChange(true)
+        vm.onResolve()
+        advanceTimeBy(2_000) // inside the 5s window
+
+        // The machine keeps faulting: a new critical reading recurs for the same machine/part.
+        store.add(alert.copy(alertId = "recur", severity = "90"))
+        advanceUntilIdle() // past the 5s window
+
+        assertTrue(
+            store.alerts.value.any { it.alert.machineNo == "M-101" },
+            "a machine still in fault must stay visible, not be auto-dismissed after resolve",
+        )
+    }
+
+    @Test
     fun resolvedAlertAutoDismissesAfterTimeout() = runTest(dispatcher) {
         val store = InMemoryAlertStore().apply { add(alert) }
         val vm = DashboardViewModel(container(store = store))

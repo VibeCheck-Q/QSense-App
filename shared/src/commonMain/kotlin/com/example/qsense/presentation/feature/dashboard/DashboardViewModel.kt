@@ -145,19 +145,25 @@ class DashboardViewModel(
             }
             if (result.isSuccess) {
                 // Keep the "Resolved" confirmation on screen briefly, then auto-dismiss the alert so
-                // it stops being a standing alert and the machine returns to live monitoring.
+                // it stops being a standing alert and the machine returns to live monitoring — UNLESS
+                // a new reading reactivated it in the window (the machine is STILL in fault), in which
+                // case it must stay visible so the technician doesn't lose a live critical alert.
                 delay(AUTO_DISMISS_MS)
-                container.alertStore.remove(resolvingAlertId)
-                if (_uiState.value.selectedAlertId == resolvingAlertId) {
-                    _uiState.update {
-                        it.copy(
-                            selectedAlertId = null,
-                            diagnosis = DiagnosisState.Idle,
-                            selectedCauseIndex = null,
-                            notes = "",
-                            fixConfirmed = false,
-                            resolve = ResolveState.Idle,
-                        )
+                val stillResolved = container.alertStore.alerts.value
+                    .firstOrNull { it.alert.alertId == resolvingAlertId }?.resolved == true
+                if (stillResolved) {
+                    container.alertStore.remove(resolvingAlertId)
+                    if (_uiState.value.selectedAlertId == resolvingAlertId) {
+                        _uiState.update {
+                            it.copy(
+                                selectedAlertId = null,
+                                diagnosis = DiagnosisState.Idle,
+                                selectedCauseIndex = null,
+                                notes = "",
+                                fixConfirmed = false,
+                                resolve = ResolveState.Idle,
+                            )
+                        }
                     }
                 }
             }
