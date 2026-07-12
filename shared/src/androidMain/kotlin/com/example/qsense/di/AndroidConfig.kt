@@ -38,8 +38,11 @@ data class GenieXConfig(
     // QAIRT/NPU bundle folder (QNN context binary + tokenizer + genie-config), side-loaded alongside
     // the GGUF. Used only on supported Snapdragon SoCs.
     val qnnModelName: String = "qsense-llm-qnn",
-    // Which runtime to drive. AUTO picks QAIRT on a supported chip when the QNN bundle is present,
-    // else the llama.cpp/GGUF path. Force a value to pin the backend for a demo.
+    // Which runtime to drive. AUTO uses the Hexagon NPU on a supported chip (SM8750/SM8850): the
+    // QAIRT plugin when a QNN bundle is present, otherwise the llama.cpp plugin — which on these
+    // chips still offloads to the Hexagon HTP DSP (see libggml-htp-v8x.so). So AUTO runs on the NPU
+    // today with a GGUF and auto-upgrades to QAIRT the moment a QNN bundle is side-loaded. Force
+    // Backend.QAIRT to require the QNN plugin (RAG-only if the QNN bundle is missing).
     val backend: Backend = Backend.AUTO,
     // SoC model substrings eligible for the QAIRT/NPU path (8 Elite / 8 Elite Gen 5). Matched
     // case-insensitively against Build.SOC_MODEL.
