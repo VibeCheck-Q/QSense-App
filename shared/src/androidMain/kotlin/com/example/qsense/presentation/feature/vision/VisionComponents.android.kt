@@ -17,6 +17,9 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -87,7 +90,12 @@ actual fun CameraCapture(onCaptured: (imageB64: String) -> Unit, modifier: Modif
                     },
                 )
             },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 20.dp)
+                .height(52.dp)
+                .fillMaxWidth(0.7f),
         ) { Text("Capture") }
     }
 }
