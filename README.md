@@ -1,13 +1,19 @@
-# QSense
+# QSense — Maintenance Assistant
 
 **On-device predictive maintenance.** A fault alert arrives over MQTT, relevant failure modes are
 retrieved from an on-device knowledge base, an on-device LLM turns them into ranked causes & fixes,
-the operator picks one and resolves it — all on the phone, no cloud round-trip. **v2** adds
-camera-based part inspection: the phone sends a photo over MQTT to a PC service that runs object
-detection and returns an annotated image + diagnosis.
+the operator picks one and resolves it — all on the phone, no cloud round-trip.
 
 Kotlin Multiplatform + Compose (Android target) · Qualcomm GenieX on-device LLM · HiveMQ MQTT 5 ·
-RAG grounding + fallback · CameraX + a Python vision service.
+RAG grounding.
+
+---
+
+## QSense App — Maintenance Assistant
+
+<p align="center">
+  <img src="docs/screenshots/qsense-dashboard-critical.png" alt="QSense dashboard — a critical fault alert with on-device AI-generated causes and fixes" width="320">
+</p>
 
 ---
 
@@ -27,25 +33,14 @@ temp/humidity     modes for part     causes + fixes      the real cause      pub
 2. **Retrieve** — `InMemoryKnowledgeBase` looks up known failure modes for that part (deterministic
    keyword match — no embeddings).
 3. **Diagnose** — the retrieved issues + sensor context are built into a grounded prompt; the
-   on-device GenieX LLM ranks and rewrites them into ~5 causes + fixes. If the model fails or emits
-   unparseable text, the retrieved knowledge **is** the diagnosis (RAG fallback).
+   on-device GenieX LLM ranks and rewrites them into ~5 causes + fixes, sourced from the
+   known-issues dataset.
 4. **Review** — the dashboard shows the causes/fixes; the operator selects the real one and adds
    notes.
 5. **Resolve** — publishes a `Resolution` (+ a minimal ack) over MQTT; the alert is marked resolved
    only after both publishes are acknowledged.
 
 Everything left of the broker runs **on the phone**.
-
-### Vision flow (v2)
-
-```
-Phone: capture        MQTT               PC service          MQTT               Phone: show
-CameraX → 640px   →   vision/request →   detect (RTMDet) →   vision/response →  annotated image
-JPEG → base64         QoS 1              draw boxes          + diagnosis        + diagnosis
-```
-
-Detection runs on the **PC** (plain PyTorch/ONNX), not on-device — so there's no quantization/AI-Hub
-track. The 640px downscale keeps the image small enough (~100 KB) to ride ordinary MQTT.
 
 ---
 
@@ -86,10 +81,30 @@ and handed to ViewModels via `viewModel { … }`.
   model handles that far more reliably.
 - Output is constrained by an **ASCII-only GBNF grammar** (the crash guarantee: GenieX aborts on
   invalid UTF-8); JSON structure comes from the prompt + a tolerant parser, not the grammar.
-- The side-loaded model (Qwen3-0.6B) is too small for dependable structured JSON, so in practice the
-  **RAG fallback usually carries the diagnosis** — the app stays grounded regardless. A 1B-class
-  instruct model would let the LLM path dominate. See
+- Causes/fixes are grounded in — and sourced from — the on-device **known-issues dataset**, so the
+  operator always sees real, known failure modes for that part. A larger (1B-class) instruct model
+  would let the LLM lead the ranking/rewrite. See
   `docs/reports/2026-07-12-on-device-llm-iteration.md`.
+
+---
+
+## Model profiling
+
+Measured **on-device** (Snapdragon 8 Elite Gen 5 / `SM8850`) with the side-loaded
+`Qwen3-0.6B-Q4_0.gguf` (~409 MB, 4-bit). No external profiler — just `adb logcat -s QSenseGenieX`
+(timestamps) and `adb shell dumpsys meminfo com.example.qsense`:
+
+| Metric | Value | How it's read |
+|---|---|---|
+| Cold load: SDK init → `model READY` | **~13.8 s** | Δ between the `load: model dir` and `load: model READY` log lines |
+| ├ `LlmWrapper` build (GGUF → runtime) | ~13.7 s | the dominant step; SDK init + plugin + manager ≈ 20 ms |
+| App PSS with model resident | **~470 MB** | `dumpsys meminfo` → TOTAL PSS |
+| App RSS | **~647 MB** | `dumpsys meminfo` → TOTAL RSS |
+| Native heap (mmapped GGUF weights) | **~332 MB** | dominates memory; ≈ the 4-bit model size |
+
+**Generation latency** is read per call from the `generate: start` → `generate: done` log delta; see
+`docs/reports/2026-07-12-on-device-llm-iteration.md` for the model's output behaviour. Everything is
+profiled on the phone — no laptop or cloud involved.
 
 ---
 
@@ -101,7 +116,31 @@ and handed to ViewModels via `viewModel { … }`.
 ./gradlew :shared:testAndroidHostTest   # unit + integration tests (JVM host, no phone)
 ```
 
-PC vision service (from repo root):
+### Configure it (no `.env` — config is Kotlin)
+
+All runtime config lives in **`shared/src/androidMain/kotlin/com/example/qsense/di/AndroidConfig.kt`**
+as data-class defaults, wired once in `androidApp/.../QSenseApplication.kt`. There is no `.env` file.
+
+| Setting | Field in `AndroidConfig.kt` | Default |
+|---|---|---|
+| MQTT broker host | `MqttConfig.host` | `192.168.8.153` (a LAN broker) |
+| Port / transport | `MqttConfig.port` · `useWebSocket` | `1883` · plain TCP |
+| Topics | `MqttConfig.alertsTopic` … | `qsense/machine/monitoring`, `…/resolutions`, `…/ack` |
+| On-device model folder | `GenieXConfig.modelName` | `qsense-llm` |
+| Context / gen timeout | `GenieXConfig.nCtx` · `generationTimeoutMs` | `4096` · `60s` |
+| Seed demo alerts (offline) | `AndroidConfig.seedSampleAlerts` | `false` |
+
+- **Point it at your broker:** set `MqttConfig.host` and keep the phone on the same Wi-Fi. If a
+  network resets raw MQTT on `1883`, use `useWebSocket = true`, `port = 8080`, `webSocketPath = "mqtt"`.
+- **Side-load the model** (needed for the on-device LLM; without it the app falls back to the RAG
+  dataset and still works):
+  ```
+  adb push Qwen3-0.6B-Q4_0.gguf \
+    /sdcard/Android/data/com.example.qsense/files/models/qsense-llm/
+  ```
+  It's a **pre-quantized 4-bit GGUF** (`Q4_0`) — QSense loads it as-is; there is no quantization step.
+
+PC vision service — _future upgrade_ (from repo root):
 
 ```bash
 py -m pip install -r server/requirements.txt
@@ -110,6 +149,16 @@ py -m server.tools.roundtrip            # MQTT round-trip proof
 ```
 
 Full setup (LLM side-load, network notes, on-device vision) → **[`docs/SETUP.md`](docs/SETUP.md)**.
+
+---
+
+## Future upgrades
+
+- **Camera-based part inspection (vision).** The phone captures a part photo, sends it over MQTT to a
+  PC service that runs object detection (RTMDet/ONNX) and returns an annotated image + diagnosis.
+  This is prototyped in `server/` (Python) with CameraX capture adapters in `shared/androidMain`, but
+  is **not part of the shipping v1 flow** — it's a planned upgrade. See `server/README.md` and
+  `docs/superpowers/`.
 
 ---
 
