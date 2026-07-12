@@ -10,7 +10,9 @@ data class AndroidConfig(
 )
 
 data class MqttConfig(
-    val host: String = "test.mosquitto.org",
+    // Local LAN broker — the public test.mosquitto.org:1883 was being reset by the network
+    // ("Connection reset by peer"). The phone must be on the same Wi-Fi/LAN as this host.
+    val host: String = "192.168.8.153",
     val port: Int = 1883,
     // Raw MQTT (1883) is reset by some networks ("Connection reset by peer"). If that happens,
     // set useWebSocket=true and port=8080 to tunnel over the broker's WebSocket listener.

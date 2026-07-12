@@ -170,10 +170,17 @@ class HiveMqttGateway(
             .topicFilter(config.alertsTopic)
             .qos(MqttQos.AT_LEAST_ONCE)
             .callback { publish ->
-                runCatching {
-                    val json = String(publish.payloadAsBytes, Charsets.UTF_8)
-                    JsonProviders.strict.decodeFromString<FaultAlert>(json)
-                }.onSuccess { alert -> if (alert.isValid()) _alerts.tryEmit(alert) }
+                val json = String(publish.payloadAsBytes, Charsets.UTF_8)
+                Log.i(TAG, "alert payload on ${config.alertsTopic}: $json")
+                runCatching { JsonProviders.strict.decodeFromString<FaultAlert>(json) }
+                    .onSuccess { alert ->
+                        if (alert.isValid()) {
+                            _alerts.tryEmit(alert)
+                        } else {
+                            Log.w(TAG, "alert DROPPED (failed validation): $alert")
+                        }
+                    }
+                    .onFailure { Log.w(TAG, "alert DROPPED (decode failed): ${it.message}") }
             }
             .send()
             .whenComplete { subAck, throwable ->
