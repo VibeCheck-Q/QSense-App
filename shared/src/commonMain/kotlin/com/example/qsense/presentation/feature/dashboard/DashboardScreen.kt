@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -114,7 +113,7 @@ private fun Header(onOpenVision: () -> Unit = {}) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         QSenseLogo(size = 40.dp)
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(
                 "QSense",
                 style = MaterialTheme.typography.headlineSmall,
@@ -127,8 +126,9 @@ private fun Header(onOpenVision: () -> Unit = {}) {
                 color = QSenseColors.inkSoft,
             )
         }
-        Spacer(Modifier.weight(1f))
-        Button(onClick = onOpenVision) { Text("Scan part") }
+        Button(onClick = onOpenVision) {
+            Text("Scan part", maxLines = 1, softWrap = false)
+        }
     }
 }
 
