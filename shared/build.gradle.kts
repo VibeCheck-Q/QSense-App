@@ -31,6 +31,12 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.geniex.android)
             implementation(libs.hivemq.mqtt.client)
+            // CameraX for the v2 vision capture screen (Android-only composables).
+            implementation("androidx.camera:camera-camera2:1.4.1")
+            implementation("androidx.camera:camera-lifecycle:1.4.1")
+            implementation("androidx.camera:camera-view:1.4.1")
+            // Compose permission launcher (rememberLauncherForActivityResult).
+            implementation("androidx.activity:activity-compose:1.9.3")
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

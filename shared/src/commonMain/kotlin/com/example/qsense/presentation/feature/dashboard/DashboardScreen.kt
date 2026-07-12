@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +58,7 @@ import com.example.qsense.presentation.theme.temperatureColor
 fun DashboardScreen(
     container: AppContainer,
     modifier: Modifier = Modifier,
+    onOpenVision: () -> Unit = {},
     viewModel: DashboardViewModel = viewModel { DashboardViewModel(container) },
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,7 +70,7 @@ fun DashboardScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Header()
+        Header(onOpenVision = onOpenVision)
         StatusRow(uiState.modelStatus, uiState.connectionState)
         HorizontalDivider(color = QSenseColors.border)
 
@@ -105,7 +107,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun Header() {
+private fun Header(onOpenVision: () -> Unit = {}) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -125,6 +127,8 @@ private fun Header() {
                 color = QSenseColors.inkSoft,
             )
         }
+        Spacer(Modifier.weight(1f))
+        Button(onClick = onOpenVision) { Text("Scan part") }
     }
 }
 
