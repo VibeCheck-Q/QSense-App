@@ -21,9 +21,36 @@ class InMemoryKnowledgeBase(
             entry.partKeywords.any { keyword -> part.contains(keyword) }
         }
         // Fall back to generic motor knowledge when the specific part isn't in the KB, so the
-        // prompt is still grounded rather than empty.
-        val chosen = matches.ifEmpty { entries.filter { "motor" in it.partKeywords } }
-        return chosen.take(maxResults)
+        // prompt is still grounded rather than empty. (Single cluster — no balancing needed.)
+        if (matches.isEmpty()) {
+            return entries.filter { "motor" in it.partKeywords }.take(maxResults)
+        }
+        // Round-robin across the matched clusters so a multi-word part like "Fan Motor" surfaces
+        // both fan- and motor-specific entries, instead of the cap slicing off whichever cluster
+        // happens to come later in the list.
+        return balanceAcrossClusters(matches, part).take(maxResults)
+    }
+
+    /** Group matches by the first part-keyword each one matches, then interleave the groups. */
+    private fun balanceAcrossClusters(matches: List<KnowledgeEntry>, part: String): List<KnowledgeEntry> {
+        val clusters = LinkedHashMap<String, MutableList<KnowledgeEntry>>()
+        for (entry in matches) {
+            val key = entry.partKeywords.first { part.contains(it) }
+            clusters.getOrPut(key) { mutableListOf() }.add(entry)
+        }
+        val result = mutableListOf<KnowledgeEntry>()
+        val cursors = clusters.values.map { it.iterator() }
+        var advanced = true
+        while (advanced) {
+            advanced = false
+            for (cursor in cursors) {
+                if (cursor.hasNext()) {
+                    result.add(cursor.next())
+                    advanced = true
+                }
+            }
+        }
+        return result
     }
 
     private companion object {
@@ -76,6 +103,36 @@ class InMemoryKnowledgeBase(
                 cause = "Loose or corroded power connection",
                 fix = "Inspect and re-terminate power wiring",
             ),
+            KnowledgeEntry(
+                partKeywords = listOf("motor"),
+                symptom = "Trips the breaker on start",
+                cause = "Winding insulation breakdown / short to ground",
+                fix = "Megger-test the windings; rewind or replace the motor",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("motor"),
+                symptom = "Burning smell / scorched insulation",
+                cause = "Sustained overload overheating the windings",
+                fix = "De-energize and cool down, reduce the load, check winding resistance",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("motor"),
+                symptom = "Hums but will not start",
+                cause = "Failed start/run capacitor",
+                fix = "Test and replace the capacitor",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("motor"),
+                symptom = "Excessive vibration",
+                cause = "Rotor imbalance or a bent shaft",
+                fix = "Balance the rotor or replace the shaft",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("motor"),
+                symptom = "Runs slow / low torque under load",
+                cause = "Low supply voltage or worn brushes",
+                fix = "Check supply voltage and terminals; inspect and replace brushes",
+            ),
             // Fan / fan-motor cluster (matches "Fan Motor" from the live monitoring feed).
             KnowledgeEntry(
                 partKeywords = listOf("fan"),
@@ -119,6 +176,36 @@ class InMemoryKnowledgeBase(
                 symptom = "Vibration",
                 cause = "Shaft misalignment",
                 fix = "Realign the spindle to spec",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Clicking / knocking noise",
+                cause = "Brinelling — dents in the races from shock load or press-fit damage",
+                fix = "Replace the bearing and avoid impact when fitting the new one",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Runs hot shortly after re-greasing",
+                cause = "Over-greasing or the wrong grease grade",
+                fix = "Purge the excess grease and use the specified lubricant",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Rapid / premature wear",
+                cause = "Contamination ingress (dust, coolant, or water)",
+                fix = "Replace the bearing and improve the seals/shielding",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Seizes on a VFD-driven shaft",
+                cause = "Electrical fluting from circulating shaft currents",
+                fix = "Fit a shaft grounding ring or an insulated bearing",
+            ),
+            KnowledgeEntry(
+                partKeywords = listOf("bearing", "spindle"),
+                symptom = "Grinding / rough rotation",
+                cause = "Loss of lubrication film and metal-to-metal contact",
+                fix = "Re-lubricate; if roughness persists, replace the bearing",
             ),
         )
     }
