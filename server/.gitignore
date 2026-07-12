@@ -1,0 +1,6 @@
+# generated round-trip output
+data/annotated_out.jpg
+# python caches
+__pycache__/
+*.pyc
+.pytest_cache/
