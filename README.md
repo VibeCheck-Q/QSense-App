@@ -70,7 +70,7 @@ and handed to ViewModels via `viewModel { … }`.
 |---|---|---|
 | **Kotlin Multiplatform** | — | Splits pure logic from platform code → JVM-testable, iOS-ready. Android is the only shipping target today. |
 | **Compose Multiplatform** | — | Declarative UI beside the shared code; one design system everywhere. |
-| **Qualcomm GenieX** | 0.3.1 | **On-device LLM** via llama.cpp/GGUF (QAIRT/Genie). The only runtime that loads our GGUF model; runs on Snapdragon 8 Elite. |
+| **[Qualcomm GenieX](https://aihub.qualcomm.com/geniex)** ([SDK](https://github.com/qualcomm/geniex)) | 0.3.1 | **On-device LLM** via llama.cpp/GGUF (QAIRT/Genie). The only runtime that loads our GGUF model; runs on Snapdragon 8 Elite. |
 | **HiveMQ MQTT client** | 1.3.15 | MQTT 5 transport, QoS 1. Async PUBACK futures, automatic reconnect, and a WebSocket transport fallback for networks that block/reset raw 1883. |
 | **kotlinx-serialization** | 1.11.0 | JSON for MQTT + LLM payloads. Multiplatform, compile-time, no reflection. `strict` for MQTT, `lenient` for model output. |
 | **kotlinx-coroutines** | — | Flows model the MQTT/LLM event streams; deterministic ViewModel tests via an injected test dispatcher. |
@@ -93,7 +93,7 @@ and handed to ViewModels via `viewModel { … }`.
 ## Model profiling
 
 Measured **on-device** (Snapdragon 8 Elite Gen 5 / `SM8850`) with the side-loaded
-`Qwen3-0.6B-Q4_0.gguf` (~409 MB, 4-bit). No external profiler — just `adb logcat -s QSenseGenieX`
+[`Qwen3-0.6B`](https://aihub.qualcomm.com/models/qwen3_0_6b) as a `Q4_0` GGUF (~409 MB, 4-bit). No external profiler — just `adb logcat -s QSenseGenieX`
 (timestamps) and `adb shell dumpsys meminfo com.example.qsense`:
 
 | Metric | Value | How it's read |
@@ -171,6 +171,19 @@ Full setup (LLM side-load, network notes, on-device vision) → **[`docs/SETUP.m
 - `docs/reports/2026-07-12-on-device-llm-iteration.md` — on-device LLM findings & why a small model.
 - `docs/superpowers/` — design specs + implementation plan for the vision pipeline.
 - `server/README.md` — PC vision service details.
+
+## Model & SDK
+
+The on-device LLM runs on Qualcomm's stack — QSense uses both **as-is** (a pre-quantized GGUF; no
+quantization of our own):
+
+- **Model — [Qwen3-0.6B](https://aihub.qualcomm.com/models/qwen3_0_6b)** (4-bit `Q4_0` GGUF) from
+  Qualcomm AI Hub · implementation reference:
+  [ai-hub-models / qwen3_0_6b](https://github.com/qualcomm/ai-hub-models/blob/v0.57.3/src/qai_hub_models/models/qwen3_0_6b/README.md)
+- **Runtime — [GenieX](https://aihub.qualcomm.com/geniex)** (QAIRT/Genie, llama.cpp/GGUF) · SDK:
+  [github.com/qualcomm/geniex](https://github.com/qualcomm/geniex)
+
+---
 
 ## Repo layout
 
