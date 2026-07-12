@@ -18,11 +18,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +50,11 @@ fun VisionScreen(
     viewModel: VisionViewModel = viewModel { VisionViewModel(container) },
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Operator-editable labels sent with the photo. Pre-filled; type the real machine/part from the
+    // monitoring alert. The model detects the part from the image — these are tags for the request.
+    var machine by remember { mutableStateOf(machineNo) }
+    var part by remember { mutableStateOf(partNo) }
 
     Column(
         modifier = modifier
@@ -85,12 +94,28 @@ fun VisionScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.weight(1f),
             ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = machine,
+                        onValueChange = { machine = it },
+                        label = { Text("Machine") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = part,
+                        onValueChange = { part = it },
+                        label = { Text("Part name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 CameraCapture(
-                    onCaptured = { viewModel.submitImage(machineNo, partNo, it) },
+                    onCaptured = { viewModel.submitImage(machine, part, it) },
                     modifier = frame,
                 )
                 Text(
-                    "Point the camera at the part and tap Capture.",
+                    "Fill in the machine & part, aim at it, and tap Capture.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = QSenseColors.inkSoft,
                 )
