@@ -89,7 +89,19 @@ the ViewModel via `viewModel { DashboardViewModel(container) }`.
   (`PublishResolutionUseCase`). Topics are distinct so the app never re-ingests its own acks; all
   configurable in `MqttConfig`. Clean start + automatic reconnect + explicit resubscribe on every
   connect. Requires the `INTERNET` permission + Netty packaging excludes in
-  `androidApp/build.gradle.kts`.
+  `androidApp/build.gradle.kts`. NOTE: some networks silently block raw MQTT on 1883 (TCP connects
+  but no CONNACK); set `MqttConfig.useWebSocket=true`, `port=8080`, `webSocketPath="mqtt"` to tunnel
+  over the broker's WebSocket listener.
+- **Vision (v2, phone↔PC over MQTT)**: the phone scans a part (CameraX capture → downscale to
+  ≤640px JPEG → base64), publishes a `VisionRequest` on `qsense/vision/request`, and a **PC-side
+  Python service (`server/`)** replies on `qsense/vision/response` with an annotated image +
+  detections + a text diagnosis (`VisionResponse`), correlated by `requestId`. Detection runs on the
+  PC (plain PyTorch/ONNX), **not** on-device — no AI Hub/quantization. `MqttGateway` carries
+  `publishVisionRequest` + a `visionResponses` flow; `VisionViewModel` publishes and awaits the
+  correlated response (15s timeout); `VisionScreen` (commonMain) + `CameraCapture`/`AnnotatedImage`
+  (`expect`/`actual`, Android CameraX in androidMain) render it, reached via a "Scan part" button on
+  the dashboard. The `server/` detector is a stub (fixed box) in Slice A; a trained RTMDet
+  (blade/disturbance, ONNX) drops in for Slice B. Specs/plan under `docs/superpowers/`.
 - **Serialization**: kotlinx-serialization (runtime 1.11.0). `JsonProviders.strict` for MQTT
   payloads, `JsonProviders.lenient` for LLM output. UTF-8 both directions. `FaultAlert.severity`
   uses `FlexibleStringSerializer` (accepts a JSON number or string); `timestamp` is free-form
@@ -101,6 +113,9 @@ the ViewModel via `viewModel { DashboardViewModel(container) }`.
 - Build app: `./gradlew :androidApp:compileDebugKotlin` / `:androidApp:assembleDebug`
 - Install on device: `./gradlew :androidApp:installDebug`
 - Unit + integration tests (JVM host, no phone): `./gradlew :shared:testAndroidHostTest`
+- PC vision service (from repo root): `py -m pip install -r server/requirements.txt`,
+  `py -m server.main` (service), `py -m server.tools.roundtrip` (MQTT round-trip proof),
+  `py -m pytest server/tests` (tests). See `server/README.md`.
 - Demo scripts + runbook: `docs/demo/`
 
 ## Testing notes
