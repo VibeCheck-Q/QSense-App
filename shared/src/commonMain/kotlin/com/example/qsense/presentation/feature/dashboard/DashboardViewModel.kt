@@ -7,6 +7,7 @@ import com.example.qsense.domain.model.PossibleCause
 import com.example.qsense.domain.service.ModelStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,8 @@ class DashboardViewModel(
                     state.copy(
                         alerts = alerts,
                         resolve = if (reactivated) ResolveState.Idle else state.resolve,
+                        // A recurring fault must be re-confirmed before it can be resolved again.
+                        fixConfirmed = if (reactivated) false else state.fixConfirmed,
                     )
                 }
             }
@@ -64,6 +67,7 @@ class DashboardViewModel(
                 diagnosis = DiagnosisState.Generating,
                 selectedCauseIndex = null,
                 notes = "",
+                fixConfirmed = false,
                 resolve = ResolveState.Idle,
             )
         }
@@ -98,6 +102,10 @@ class DashboardViewModel(
         _uiState.update { it.copy(notes = notes) }
     }
 
+    fun onFixConfirmedChange(confirmed: Boolean) {
+        _uiState.update { it.copy(fixConfirmed = confirmed) }
+    }
+
     fun onResolve() {
         val state = _uiState.value
         if (!state.canResolve) return
@@ -130,6 +138,28 @@ class DashboardViewModel(
                     ),
                 )
             }
+            if (result.isSuccess) {
+                // Keep the "Resolved" confirmation on screen briefly, then auto-dismiss the alert so
+                // it stops being a standing alert and the machine returns to live monitoring.
+                delay(AUTO_DISMISS_MS)
+                container.alertStore.remove(resolvingAlertId)
+                if (_uiState.value.selectedAlertId == resolvingAlertId) {
+                    _uiState.update {
+                        it.copy(
+                            selectedAlertId = null,
+                            diagnosis = DiagnosisState.Idle,
+                            selectedCauseIndex = null,
+                            notes = "",
+                            fixConfirmed = false,
+                            resolve = ResolveState.Idle,
+                        )
+                    }
+                }
+            }
         }
+    }
+
+    private companion object {
+        const val AUTO_DISMISS_MS = 5_000L
     }
 }

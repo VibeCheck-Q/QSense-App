@@ -50,4 +50,8 @@ class InMemoryAlertStore : AlertStore {
             }
         }
     }
+
+    override fun remove(alertId: String) {
+        _alerts.update { current -> current.filterNot { it.alert.alertId == alertId } }
+    }
 }

@@ -20,4 +20,11 @@ interface AlertStore {
 
     /** Marks the alert with [alertId] as resolved, if present. */
     fun markResolved(alertId: String)
+
+    /**
+     * Removes the alert with [alertId], if present. Used to auto-dismiss a resolved alert shortly
+     * after it is resolved, so it stops being a standing alert and the machine returns to normal
+     * live monitoring.
+     */
+    fun remove(alertId: String)
 }

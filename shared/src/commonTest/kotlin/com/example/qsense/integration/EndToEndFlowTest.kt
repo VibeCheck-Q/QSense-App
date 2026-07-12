@@ -12,6 +12,7 @@ import com.example.qsense.testutil.FixedClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -63,11 +64,12 @@ class EndToEndFlowTest {
         assertTrue(diagnosis is DiagnosisState.Ready)
         assertEquals("Seal degradation", diagnosis.diagnosis.causes[0].cause)
 
-        // Operator resolves; the resolution is published back.
+        // Operator resolves; the resolution is published back. Resolve is gated on confirming the fix.
         vm.onSelectCause(0)
         vm.onNotesChange("Confirmed leak at inlet flange")
+        vm.onFixConfirmedChange(true)
         vm.onResolve()
-        advanceUntilIdle()
+        advanceTimeBy(100) // publish completes; before the 5s auto-dismiss window
 
         assertEquals(ResolveState.Done, vm.uiState.value.resolve)
         assertEquals(1, gateway.published.size)
@@ -78,6 +80,10 @@ class EndToEndFlowTest {
         assertEquals("Replace seal kit", resolution.appliedFix)
         assertEquals("2026-07-11T10:45:00Z", resolution.resolvedAt)
         assertTrue(store.alerts.value.first().resolved)
+
+        // After the timeout the resolved alert auto-dismisses back to live monitoring.
+        advanceUntilIdle()
+        assertTrue(store.alerts.value.isEmpty())
 
         ingestJob.cancel()
     }

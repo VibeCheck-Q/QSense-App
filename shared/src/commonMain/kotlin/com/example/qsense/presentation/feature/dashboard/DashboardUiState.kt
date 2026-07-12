@@ -14,16 +14,21 @@ data class DashboardUiState(
     val diagnosis: DiagnosisState = DiagnosisState.Idle,
     val selectedCauseIndex: Int? = null,
     val notes: String = "",
+    val fixConfirmed: Boolean = false,
     val resolve: ResolveState = ResolveState.Idle,
 ) {
     val selectedAlert: AlertItem?
         get() = alerts.firstOrNull { it.alert.alertId == selectedAlertId }
 
-    /** Resolve is allowed once a cause is chosen, a diagnosis exists, and we're not mid-publish. */
+    /**
+     * Resolve is allowed once a cause is chosen, a diagnosis exists, we're not mid-publish, and the
+     * operator has ticked the "I confirm the fault is fixed" box — nothing publishes until they do.
+     */
     val canResolve: Boolean
         get() = selectedCauseIndex != null &&
             diagnosis is DiagnosisState.Ready &&
             resolve !is ResolveState.Publishing &&
+            fixConfirmed &&
             selectedAlert?.resolved == false
 }
 

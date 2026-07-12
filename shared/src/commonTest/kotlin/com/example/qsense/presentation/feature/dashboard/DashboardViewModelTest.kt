@@ -10,6 +10,7 @@ import com.example.qsense.testutil.FakeTextGenerator
 import com.example.qsense.testutil.FixedClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -18,6 +19,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DashboardViewModelTest {
@@ -70,13 +72,34 @@ class DashboardViewModelTest {
         advanceUntilIdle()
         vm.onSelectCause(0)
         vm.onNotesChange("checked flange")
+        vm.onFixConfirmedChange(true)
         vm.onResolve()
-        advanceUntilIdle()
+        advanceTimeBy(100) // publish completes; the 5s auto-dismiss window has not elapsed yet
 
         assertEquals(1, gateway.published.size)
         assertEquals("checked flange", gateway.published.first().notes)
         assertEquals(ResolveState.Done, vm.uiState.value.resolve)
         assertTrue(store.alerts.value.first { it.alert.alertId == "a1" }.resolved)
+    }
+
+    @Test
+    fun resolvedAlertAutoDismissesAfterTimeout() = runTest(dispatcher) {
+        val store = InMemoryAlertStore().apply { add(alert) }
+        val vm = DashboardViewModel(container(store = store))
+        advanceUntilIdle()
+
+        vm.onSelectAlert("a1")
+        advanceUntilIdle()
+        vm.onSelectCause(0)
+        vm.onFixConfirmedChange(true)
+        vm.onResolve()
+
+        advanceTimeBy(4_000) // still inside the 5s confirmation window
+        assertEquals(1, store.alerts.value.size, "resolved alert stays during the confirmation window")
+
+        advanceUntilIdle() // past the 5s window
+        assertTrue(store.alerts.value.isEmpty(), "resolved alert is auto-dismissed after the timeout")
+        assertEquals(null, vm.uiState.value.selectedAlertId, "panel resets to live monitoring")
     }
 
     @Test
@@ -89,6 +112,7 @@ class DashboardViewModelTest {
         vm.onSelectAlert("a1")
         advanceUntilIdle()
         vm.onSelectCause(0)
+        vm.onFixConfirmedChange(true)
         vm.onResolve()
         advanceUntilIdle()
 
@@ -124,6 +148,49 @@ class DashboardViewModelTest {
         vm.onSelectAlert("a1") // reselect same alert — must not reset the panel
 
         assertEquals(0, vm.uiState.value.selectedCauseIndex)
+    }
+
+    @Test
+    fun resolveBlockedUntilFixConfirmed() = runTest(dispatcher) {
+        val gateway = FakeMqttGateway()
+        val store = InMemoryAlertStore().apply { add(alert) }
+        val vm = DashboardViewModel(container(gateway = gateway, store = store))
+        advanceUntilIdle()
+
+        vm.onSelectAlert("a1")
+        advanceUntilIdle()
+        vm.onSelectCause(0)
+
+        // A cause is picked but the box is unchecked: resolve is blocked and nothing publishes.
+        assertFalse(vm.uiState.value.canResolve)
+        vm.onResolve()
+        advanceUntilIdle()
+        assertEquals(0, gateway.published.size)
+
+        // Ticking the box enables resolve; now it publishes.
+        vm.onFixConfirmedChange(true)
+        assertTrue(vm.uiState.value.canResolve)
+        vm.onResolve()
+        advanceUntilIdle()
+        assertEquals(1, gateway.published.size)
+    }
+
+    @Test
+    fun fixConfirmationResetsWhenSwitchingAlert() = runTest(dispatcher) {
+        val second = alert.copy(alertId = "a2", machineNo = "M-202")
+        val store = InMemoryAlertStore().apply { add(alert); add(second) }
+        val vm = DashboardViewModel(container(store = store))
+        advanceUntilIdle()
+
+        vm.onSelectAlert("a1")
+        advanceUntilIdle()
+        vm.onFixConfirmedChange(true)
+        assertTrue(vm.uiState.value.fixConfirmed)
+
+        // Switching to another alert clears the confirmation — it must be re-checked per alert.
+        vm.onSelectAlert("a2")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.fixConfirmed)
     }
 
     @Test

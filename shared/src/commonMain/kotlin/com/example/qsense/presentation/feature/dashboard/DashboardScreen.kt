@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -333,6 +334,26 @@ private fun DiagnosisPanel(
                         label = { Text("Operator notes") },
                         modifier = Modifier.fillMaxWidth(),
                     )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.onFixConfirmedChange(!uiState.fixConfirmed) }
+                            .semantics {
+                                contentDescription = "Confirm the fault is fixed before resolving"
+                            },
+                    ) {
+                        Checkbox(
+                            checked = uiState.fixConfirmed,
+                            onCheckedChange = viewModel::onFixConfirmedChange,
+                        )
+                        Text(
+                            "I confirm the fault is fixed",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = QSenseColors.ink,
+                        )
+                    }
 
                     Button(
                         onClick = viewModel::onResolve,
