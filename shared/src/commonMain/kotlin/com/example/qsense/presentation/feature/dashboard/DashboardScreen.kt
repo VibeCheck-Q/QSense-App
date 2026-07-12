@@ -280,6 +280,24 @@ private fun DiagnosisPanel(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // Once resolved, hide this issue's causes & fixes and show a confirmation instead. The alert
+        // list keeps streaming live data; if the same fault recurs the store resets it to unresolved
+        // and the causes reappear automatically.
+        if (uiState.selectedAlert?.resolved == true) {
+            Text(
+                "Resolved",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = QSenseColors.sage,
+            )
+            Text(
+                "Fix applied and acknowledgement sent. Monitoring for new readings…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = QSenseColors.inkSoft,
+            )
+            return@Column
+        }
+
         Text(
             "Likely causes & fixes",
             style = MaterialTheme.typography.titleMedium,
