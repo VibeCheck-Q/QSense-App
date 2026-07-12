@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.qsense.di.AppContainer
 import com.example.qsense.domain.model.PossibleCause
 import com.example.qsense.domain.service.ModelStatus
+import com.example.qsense.presentation.theme.Criticality
+import com.example.qsense.presentation.theme.classifySeverity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -28,13 +30,16 @@ class DashboardViewModel(
         // Alerts, model status, and connection state are collected into UI state.
         viewModelScope.launch(container.dispatcher) {
             container.observeAlertsUseCase().collect { alerts ->
+                // Only actual alerts (WARNING/CRITICAL) are surfaced to the technician. A normal OK
+                // reading is live monitoring data, not an alert, so its machine is not shown.
+                val visible = alerts.filter { classifySeverity(it.alert.severity) != Criticality.OK }
                 _uiState.update { state ->
                     // If the selected alert recurred (reset to unresolved) after we'd resolved it,
                     // clear the stale "resolved" banner so the operator can resolve it again.
                     val reactivated = state.resolve is ResolveState.Done &&
-                        alerts.firstOrNull { it.alert.alertId == state.selectedAlertId }?.resolved == false
+                        visible.firstOrNull { it.alert.alertId == state.selectedAlertId }?.resolved == false
                     state.copy(
-                        alerts = alerts,
+                        alerts = visible,
                         resolve = if (reactivated) ResolveState.Idle else state.resolve,
                         // A recurring fault must be re-confirmed before it can be resolved again.
                         fixConfirmed = if (reactivated) false else state.fixConfirmed,

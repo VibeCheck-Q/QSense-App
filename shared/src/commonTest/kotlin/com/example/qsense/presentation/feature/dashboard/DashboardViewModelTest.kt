@@ -83,6 +83,19 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun onlyActualAlertsAreShownNotOkReadings() = runTest(dispatcher) {
+        val okReading = alert.copy(alertId = "ok1", machineNo = "M-OK", severity = "3.0")
+        val criticalAlert = alert.copy(alertId = "c1", machineNo = "M-CRIT", severity = "80.0")
+        val store = InMemoryAlertStore().apply { add(okReading); add(criticalAlert) }
+        val vm = DashboardViewModel(container(store = store))
+        advanceUntilIdle()
+
+        val shown = vm.uiState.value.alerts.map { it.alert.alertId }
+        assertTrue("c1" in shown, "a critical reading is an alert and must show")
+        assertTrue("ok1" !in shown, "an OK reading is live data, not an alert — must not show")
+    }
+
+    @Test
     fun resolvedAlertAutoDismissesAfterTimeout() = runTest(dispatcher) {
         val store = InMemoryAlertStore().apply { add(alert) }
         val vm = DashboardViewModel(container(store = store))
