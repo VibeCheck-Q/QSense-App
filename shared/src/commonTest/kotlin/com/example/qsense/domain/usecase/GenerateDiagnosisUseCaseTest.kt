@@ -3,6 +3,7 @@ package com.example.qsense.domain.usecase
 import com.example.qsense.data.knowledge.InMemoryKnowledgeBase
 import com.example.qsense.domain.model.FaultAlert
 import com.example.qsense.domain.parse.JsonDiagnosisParser
+import com.example.qsense.domain.prompt.DiagnosisPrompt
 import com.example.qsense.domain.service.OutputConstraint
 import com.example.qsense.testutil.FakeTextGenerator
 import kotlinx.coroutines.test.runTest
@@ -69,8 +70,8 @@ class GenerateDiagnosisUseCaseTest {
 
         useCase(generator)(alert)
 
-        // The master/system prompt is sent as a system message…
-        assertTrue(generator.lastSystem?.isNotBlank() == true, "system prompt not sent")
+        // The exact master/system prompt is what the LLM receives (not just some non-blank string).
+        assertEquals(DiagnosisPrompt.SYSTEM, generator.lastSystem, "master SYSTEM prompt must be sent verbatim")
         // …and retrieved blade knowledge (the grease/slowdown entry) grounds the user prompt.
         val prompt = generator.lastPrompt ?: ""
         assertTrue(prompt.contains("Reference knowledge"), "knowledge block missing")

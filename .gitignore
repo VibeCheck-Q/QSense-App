@@ -37,3 +37,7 @@ Thumbs.db
 # Env / secrets
 .env
 .env.*
+
+# Local hackathon presentation (kept local, not tracked)
+HACKATHON.md
+docs/presentation/
