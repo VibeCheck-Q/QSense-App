@@ -12,7 +12,9 @@ RAG grounding.
 ## QSense App — Maintenance Assistant
 
 <p align="center">
-  <img src="docs/screenshots/qsense-dashboard-critical.png" alt="QSense dashboard — a critical fault alert with on-device AI-generated causes and fixes" width="320">
+  <img src="docs/screenshots/qsense-dashboard-alert.jpg" alt="QSense dashboard — a fault alert with on-device AI-generated causes and fixes" width="320">
+  <br>
+  <em>A live fault alert — the <strong>issue</strong> (M-01 · Fan-Motor, WARNING) with on-device AI-generated likely causes &amp; fixes (the <strong>solution</strong>).</em>
 </p>
 
 ---
